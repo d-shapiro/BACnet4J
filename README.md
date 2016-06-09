@@ -2,31 +2,8 @@ BACnet4J
 ========
 BACnet4J is a pure Java implementation of the BACnet specification. Originally developed for supervisory use, it now includes support for many objects and so may be suitable for embedded use as well. Protocols supported include IPv4, IPv6, and MS/TP.
 
-A discussion forum for this package can be found at http://infiniteautomation.com/forum/category/12/bacnet4j-general-discussion.
+This fork of BACnet4j fixes an issue with the handling of out-of-order segmented messages. 
 
-A public Maven Repository is now available with the latest builds add this to your pom.xml
-    <repositories>
-        <repository>
-            <releases>
-                <enabled>true</enabled>
-                <checksumPolicy>ignore</checksumPolicy>
-            </releases>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-            <id>bacnet-data-source</id>
-            <name>BACnet Dependencies</name>
-           <url>http://mangoautomation.net:9902/maven-repo/</url>
-        </repository>
-    </repositories>
-    
-The dependency information is:
-
-   <dependency>
-     <groupId>com.serotonin</groupId>
-     <artifactId>bacnet4j</artifactId>
-   	 <version>3.2.2</version>
-   </dependency>
 =======
 Releases
 ========

@@ -565,11 +565,16 @@ public class DefaultTransport implements Transport, Runnable {
                 else if (ack instanceof ComplexACK) {
                     ComplexACK cack = ((ComplexACK) ack);
                     if (cack.isSegmentedMessage()) {
-                        try {
-                            segmentedIncoming(key, cack, ctx);
-                        }
-                        catch (BACnetException e) {
-                            consumer.ex(e);
+                    	if (segmentOutOfOrder(cack, ctx)) {
+                            ctx.reset(segTimeout * 4, 0);
+                            unackedMessages.add(key, ctx);
+                            incoming.add(npdu);
+                        } else {
+                            try {
+                                segmentedIncoming(key, cack, ctx);
+                            } catch (BACnetException e) {
+                                consumer.ex(e);
+                            }
                         }
                     }
                     else
@@ -584,6 +589,17 @@ public class DefaultTransport implements Transport, Runnable {
                 else
                     LOG.error("Unexpected ack APDU: " + ack);
             }
+        }
+    }
+    
+    private boolean segmentOutOfOrder(Segmentable msg, UnackedMessageContext ctx) {
+        int lastSeq = msg.getSequenceNumber() & 0xff;
+        if (ctx.getSegmentWindow() == null) {
+            return (lastSeq != 0);
+        } else {
+            int last = ctx.getSegmentWindow().getLatestSequenceId();
+            if (last == -1) last = 0;
+            return (last + 1 != lastSeq);
         }
     }
 
