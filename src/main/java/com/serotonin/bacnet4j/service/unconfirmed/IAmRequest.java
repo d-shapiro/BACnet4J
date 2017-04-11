@@ -109,16 +109,16 @@ public class IAmRequest extends UnconfirmedRequestService {
             localDevice.execute(() -> {
                 LOG.debug("{} received and IAm from {}. Asynchronously creating remote device",
                         localDevice.getInstanceNumber(), remoteDoi);
-                try {
                     final RemoteDevice rd = new RemoteDevice(localDevice, remoteDoi, from);
                     rd.setDeviceProperty(PropertyIdentifier.maxApduLengthAccepted, maxAPDULengthAccepted);
                     rd.setDeviceProperty(PropertyIdentifier.segmentationSupported, segmentationSupported);
                     rd.setDeviceProperty(PropertyIdentifier.vendorIdentifier, vendorId);
-                    DiscoveryUtils.getExtendedDeviceInformation(localDevice, rd);
+//                try {
+//                    DiscoveryUtils.getExtendedDeviceInformation(localDevice, rd);
+//                } catch (final BACnetException e) {
+//                    LOG.warn("Error while discovering extended device information from {} at {}", remoteDoi, from, e);
+//                }
                     localDevice.getEventHandler().fireIAmReceived(rd);
-                } catch (final BACnetException e) {
-                    LOG.warn("Error while discovering extended device information from {} at {}", remoteDoi, from, e);
-                }
             });
         } else {
             d.setDeviceProperty(PropertyIdentifier.maxApduLengthAccepted, maxAPDULengthAccepted);
