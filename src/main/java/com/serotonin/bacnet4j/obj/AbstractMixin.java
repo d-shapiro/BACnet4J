@@ -70,6 +70,10 @@ public class AbstractMixin {
         bo.writePropertyInternal(pid, value);
     }
 
+    protected final void set(final PropertyIdentifier pid, final Encodable value) {
+        bo.set(pid, value);
+    }
+
     protected final <T extends Encodable> T get(final PropertyIdentifier pid) {
         return bo.get(pid);
     }
@@ -95,8 +99,10 @@ public class AbstractMixin {
      * Allow the mixin a chance to perform actions before the property is read.
      *
      * @param pid
+     * @throws BACnetServiceException
+     *             if for some reason the read should be prevented.
      */
-    protected void beforeReadProperty(final PropertyIdentifier pid) {
+    protected void beforeReadProperty(final PropertyIdentifier pid) throws BACnetServiceException {
         // no op
     }
 
@@ -107,6 +113,7 @@ public class AbstractMixin {
      * @param value
      * @return true of the validation was handled, false otherwise.
      * @throws BACnetServiceException
+     *             if the property was so bad that an exception had to be thrown
      */
     protected boolean validateProperty(final ValueSource valueSource, final PropertyValue value)
             throws BACnetServiceException {
@@ -133,6 +140,13 @@ public class AbstractMixin {
      */
     protected void afterWriteProperty(final PropertyIdentifier pid, final Encodable oldValue,
             final Encodable newValue) {
+        // no op
+    }
+
+    /**
+     * Provides notice to the mixin that the object was removed from the device.
+     */
+    protected void terminate() {
         // no op
     }
 }

@@ -31,19 +31,20 @@ package com.serotonin.bacnet4j.type.constructed;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 
+import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.type.primitive.Date;
 import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
-public class DateTime extends BaseType {
+public class DateTime extends BaseType implements Comparable<DateTime> {
     public static final DateTime UNSPECIFIED = new DateTime(Date.UNSPECIFIED, Time.UNSPECIFIED);
 
     private final Date date;
     private final Time time;
 
-    public DateTime() {
-        this(new GregorianCalendar());
+    public DateTime(final LocalDevice localDevice) {
+        this(localDevice.getClock().millis());
     }
 
     public DateTime(final Date date, final Time time) {
@@ -87,6 +88,23 @@ public class DateTime extends BaseType {
                 date.getDay(), time.getHour(), time.getMinute(), time.getSecond());
         gc.set(Calendar.MILLISECOND, time.getHundredth() * 10);
         return gc;
+    }
+
+    public boolean isFullySpecified() {
+        return date.isSpecific() && time.isFullySpecified();
+    }
+
+    @Override
+    public int compareTo(final DateTime o) {
+        final int comp = date.compareTo(o.date);
+        if (comp == 0) {
+            if (time.equals(o.time))
+                return 0;
+            if (time.before(o.time))
+                return -1;
+            return 1;
+        }
+        return comp;
     }
 
     @Override

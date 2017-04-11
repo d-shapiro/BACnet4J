@@ -147,4 +147,9 @@ public class PropertyReferences implements Serializable {
             size += list.size();
         return size;
     }
+
+    @Override
+    public String toString() {
+        return "PropertyReferences [properties=" + properties + "]";
+    }
 }

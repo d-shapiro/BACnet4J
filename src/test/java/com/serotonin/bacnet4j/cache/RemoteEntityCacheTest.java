@@ -3,22 +3,22 @@ package com.serotonin.bacnet4j.cache;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 
-import java.util.Calendar;
-
 import org.junit.Test;
 
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.npdu.test.TestNetwork;
-import com.serotonin.bacnet4j.obj.TestClock;
+import com.serotonin.bacnet4j.npdu.test.TestNetworkMap;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
 
+import lohbihler.warp.WarpClock;
+
 public class RemoteEntityCacheTest {
+    private final TestNetworkMap map = new TestNetworkMap();
+
     @Test
     public void test() {
-        final TestClock clock = new TestClock();
-
-        final LocalDevice d = new LocalDevice(0, new DefaultTransport(new TestNetwork(1, 10)));
-        d.setClock(clock);
+        final WarpClock clock = new WarpClock();
+        final LocalDevice d = new LocalDevice(0, new DefaultTransport(new TestNetwork(map, 1, 10))).withClock(clock);
 
         final RemoteEntityCache<String, String> cache = new RemoteEntityCache<>(d);
 
@@ -31,14 +31,14 @@ public class RemoteEntityCacheTest {
         assertEquals("value3", cache.getCachedEntity("key3"));
 
         // Advance the clock 10 seconds
-        clock.add(Calendar.SECOND, 10);
+        clock.plusSeconds(10);
 
         assertNull(cache.getCachedEntity("key1"));
         assertNull(cache.getCachedEntity("key2"));
         assertEquals("value3", cache.getCachedEntity("key3"));
 
         // Advance the clock 1 year
-        clock.add(Calendar.YEAR, 1);
+        clock.plusYears(1);
 
         assertNull(cache.getCachedEntity("key1"));
         assertNull(cache.getCachedEntity("key2"));

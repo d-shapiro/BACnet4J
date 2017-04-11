@@ -58,6 +58,10 @@ public class ObjectIdentifier extends Primitive {
         return instanceNumber;
     }
 
+    public boolean isUninitialized() {
+        return instanceNumber == UNINITIALIZED;
+    }
+
     @Override
     public String toString() {
         return objectType.toString() + " " + instanceNumber;

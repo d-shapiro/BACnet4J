@@ -33,6 +33,7 @@ import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.MulticastSocket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -99,6 +100,13 @@ public class Ipv6Network extends Network implements Runnable {
         this.multicastAddress = multicastAddress;
         this.port = port;
         this.localBindAddress = localBindAddress;
+
+        try {
+            vmacTable.put(thisVMAC, Ipv6NetworkUtils.toOctetString(InetAddress.getByName("::1").getAddress(), port));
+        } catch (final UnknownHostException e) {
+            // Should never happen
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
@@ -385,28 +393,11 @@ public class Ipv6Network extends Network implements Runnable {
     @Override
     public Address[] getAllLocalAddresses() {
         return new Address[] { new Address(getLocalNetworkNumber(), thisVMAC) };
-        //        try {
-        //            List<Address> result = new ArrayList<Address>();
-        //            for (NetworkInterface iface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
-        //                if (iface.isLoopback() || iface.isPointToPoint() || iface.isVirtual() || !iface.supportsMulticast()
-        //                        || !iface.isUp())
-        //                    continue;
-        //
-        //                for (InetAddress addr : Collections.list(iface.getInetAddresses())) {
-        //                    if (!addr.isLoopbackAddress() && (addr.isSiteLocalAddress() || addr.isLinkLocalAddress())) {
-        //                        Address address = getAddress(addr);
-        //                        if (address != null)
-        //                            result.add(address);
-        //                    }
-        //                }
-        //            }
-        //
-        //            return result.toArray(new Address[result.size()]);
-        //        }
-        //        catch (Exception e) {
-        //            // Should never happen, so just wrap in a RuntimeException
-        //            throw new RuntimeException(e);
-        //        }
+    }
+
+    @Override
+    public Address getLoopbackAddress() {
+        return new Address(getLocalNetworkNumber(), thisVMAC);
     }
 
     private void purgePendingAddressResolutions() {

@@ -65,7 +65,7 @@ public class ChangeOfStateNotif extends AbstractNotificationParameter {
 
     @Override
     public String toString() {
-        return "ChangeOfState [newState=" + newState + ", statusFlags=" + statusFlags + "]";
+        return "ChangeOfStateNotif [newState=" + newState + ", statusFlags=" + statusFlags + "]";
     }
 
     @Override

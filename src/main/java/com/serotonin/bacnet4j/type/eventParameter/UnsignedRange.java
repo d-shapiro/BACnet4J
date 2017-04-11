@@ -30,6 +30,7 @@ package com.serotonin.bacnet4j.type.eventParameter;
 
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.EventAlgorithm;
+import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.UnsignedRangeAlgo;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
@@ -74,7 +75,7 @@ public class UnsignedRange extends AbstractEventParameter {
 
     @Override
     public EventAlgorithm createEventAlgorithm() {
-        return null;
+        return new UnsignedRangeAlgo();
     }
 
     @Override

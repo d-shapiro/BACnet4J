@@ -29,6 +29,7 @@
 package com.serotonin.bacnet4j.type.eventParameter;
 
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.ChangeOfLifeSafetyAlgo;
 import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.EventAlgorithm;
 import com.serotonin.bacnet4j.type.constructed.DeviceObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
@@ -87,7 +88,12 @@ public class ChangeOfLifeSafety extends AbstractEventParameter {
 
     @Override
     public EventAlgorithm createEventAlgorithm() {
-        return null;
+        return new ChangeOfLifeSafetyAlgo();
+    }
+
+    @Override
+    public DeviceObjectPropertyReference getReference() {
+        return modePropertyReference;
     }
 
     @Override

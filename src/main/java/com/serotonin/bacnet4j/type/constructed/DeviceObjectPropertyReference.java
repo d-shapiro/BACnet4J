@@ -29,6 +29,7 @@
 package com.serotonin.bacnet4j.type.constructed;
 
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
@@ -39,6 +40,11 @@ public class DeviceObjectPropertyReference extends BaseType {
     private final PropertyIdentifier propertyIdentifier; // 1
     private final UnsignedInteger propertyArrayIndex; // 2 optional
     private final ObjectIdentifier deviceIdentifier; // 3 optional
+
+    public DeviceObjectPropertyReference(final int deviceNumber, final ObjectIdentifier objectIdentifier,
+            final PropertyIdentifier propertyIdentifier) {
+        this(objectIdentifier, propertyIdentifier, null, new ObjectIdentifier(ObjectType.device, deviceNumber));
+    }
 
     public DeviceObjectPropertyReference(final ObjectIdentifier objectIdentifier,
             final PropertyIdentifier propertyIdentifier, final UnsignedInteger propertyArrayIndex,

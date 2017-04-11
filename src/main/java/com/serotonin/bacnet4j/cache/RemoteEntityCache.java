@@ -30,8 +30,10 @@ package com.serotonin.bacnet4j.cache;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +102,12 @@ public class RemoteEntityCache<K, T> {
             if (cp == null)
                 return null;
             return cp.getEntity();
+        }
+    }
+
+    public List<T> getEntities() {
+        synchronized (cache) {
+            return cache.values().stream().map((e) -> e.getEntity()).collect(Collectors.toList());
         }
     }
 

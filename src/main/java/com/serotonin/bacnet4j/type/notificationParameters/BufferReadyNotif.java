@@ -73,6 +73,12 @@ public class BufferReadyNotif extends AbstractNotificationParameter {
     }
 
     @Override
+    public String toString() {
+        return "BufferReadyNotif [bufferProperty=" + bufferProperty + ", previousNotification=" + previousNotification
+                + ", currentNotification=" + currentNotification + "]";
+    }
+
+    @Override
     public int hashCode() {
         final int PRIME = 31;
         int result = 1;

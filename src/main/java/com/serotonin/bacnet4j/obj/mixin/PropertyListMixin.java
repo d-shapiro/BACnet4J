@@ -52,7 +52,7 @@ public class PropertyListMixin extends AbstractMixin {
     }
 
     @Override
-    public boolean writeProperty(final ValueSource valueSource, final PropertyValue value)
+    protected boolean validateProperty(final ValueSource valueSource, final PropertyValue value)
             throws BACnetServiceException {
         if (propertyList.equals(value.getPropertyIdentifier()))
             throw new BACnetServiceException(ErrorClass.property, ErrorCode.writeAccessDenied);

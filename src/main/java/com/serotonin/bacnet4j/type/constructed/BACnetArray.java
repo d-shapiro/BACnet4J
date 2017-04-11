@@ -65,13 +65,13 @@ public class BACnetArray<E extends Encodable> extends SequenceOf<E> {
         super(queue, clazz, contextId);
     }
 
-    public BACnetArray<E> put(final int indexBase1, final E value) {
-        set(indexBase1, value);
+    public BACnetArray<E> putBase1(final int indexBase1, final E value) {
+        setBase1(indexBase1, value);
         return this;
     }
 
     @Override
-    public void set(final int indexBase1, final E value) {
+    public void setBase1(final int indexBase1, final E value) {
         values.set(indexBase1 - 1, value);
     }
 

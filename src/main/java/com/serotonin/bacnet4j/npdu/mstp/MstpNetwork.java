@@ -52,6 +52,10 @@ public class MstpNetwork extends Network {
         node.setNetwork(this);
     }
 
+    public MstpNode getNode() {
+        return node;
+    }
+
     @Override
     public MaxApduLength getMaxApduLength() {
         return MaxApduLength.UP_TO_480;
@@ -60,7 +64,7 @@ public class MstpNetwork extends Network {
     @Override
     public void initialize(final Transport transport) throws Exception {
         super.initialize(transport);
-        node.initialize(transport.getLocalDevice().getClock());
+        node.initialize(transport);
     }
 
     @Override
@@ -81,6 +85,11 @@ public class MstpNetwork extends Network {
     @Override
     public Address[] getAllLocalAddresses() {
         return new Address[] { MstpNetworkUtils.toAddress(getLocalNetworkNumber(), node.getThisStation()) };
+    }
+
+    @Override
+    public Address getLoopbackAddress() {
+        return MstpNetworkUtils.toAddress(getLocalNetworkNumber(), node.getThisStation());
     }
 
     @Override

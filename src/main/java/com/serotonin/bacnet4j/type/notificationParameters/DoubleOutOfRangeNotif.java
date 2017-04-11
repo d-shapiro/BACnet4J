@@ -36,10 +36,10 @@ import com.serotonin.bacnet4j.util.sero.ByteQueue;
 public class DoubleOutOfRangeNotif extends AbstractNotificationParameter {
     public static final byte TYPE_ID = 14;
 
-    private final com.serotonin.bacnet4j.type.primitive.Double exceedingValue;
+    private final Double exceedingValue;
     private final StatusFlags statusFlags;
-    private final com.serotonin.bacnet4j.type.primitive.Double deadband;
-    private final com.serotonin.bacnet4j.type.primitive.Double exceedingLimit;
+    private final Double deadband;
+    private final Double exceedingLimit;
 
     public DoubleOutOfRangeNotif(final Double exceedingValue, final StatusFlags statusFlags, final Double deadband,
             final Double exceedingLimit) {
@@ -58,13 +58,13 @@ public class DoubleOutOfRangeNotif extends AbstractNotificationParameter {
     }
 
     public DoubleOutOfRangeNotif(final ByteQueue queue) throws BACnetException {
-        exceedingValue = read(queue, com.serotonin.bacnet4j.type.primitive.Double.class, 0);
+        exceedingValue = read(queue, Double.class, 0);
         statusFlags = read(queue, StatusFlags.class, 1);
-        deadband = read(queue, com.serotonin.bacnet4j.type.primitive.Double.class, 2);
-        exceedingLimit = read(queue, com.serotonin.bacnet4j.type.primitive.Double.class, 3);
+        deadband = read(queue, Double.class, 2);
+        exceedingLimit = read(queue, Double.class, 3);
     }
 
-    public com.serotonin.bacnet4j.type.primitive.Double getExceedingValue() {
+    public Double getExceedingValue() {
         return exceedingValue;
     }
 
@@ -72,11 +72,11 @@ public class DoubleOutOfRangeNotif extends AbstractNotificationParameter {
         return statusFlags;
     }
 
-    public com.serotonin.bacnet4j.type.primitive.Double getDeadband() {
+    public Double getDeadband() {
         return deadband;
     }
 
-    public com.serotonin.bacnet4j.type.primitive.Double getExceedingLimit() {
+    public Double getExceedingLimit() {
         return exceedingLimit;
     }
 

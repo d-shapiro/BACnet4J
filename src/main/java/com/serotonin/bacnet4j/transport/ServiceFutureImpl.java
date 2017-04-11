@@ -45,7 +45,6 @@ public class ServiceFutureImpl implements ServiceFuture, ResponseConsumer {
     private AcknowledgementService ack;
     private AckAPDU fail;
     private BACnetException ex;
-    private volatile boolean success;
     private volatile boolean done;
 
     private final long timeout; //Timeout to wait before giving up
@@ -58,23 +57,24 @@ public class ServiceFutureImpl implements ServiceFuture, ResponseConsumer {
         this.timeout = timeout;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public synchronized <T extends AcknowledgementService> T get() throws BACnetException {
         if (done) {
-            if (ex != null)
-                throw ex;
-            return (T) ack;
+            return result();
         }
 
         ThreadUtils.wait(this, timeout);
 
-        if (ex == null && !success && fail == null)
+        if (!done)
             throw new BACnetTimeoutException("Timeout waiting for response.");
 
+        return result();
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends AcknowledgementService> T result() throws BACnetException {
         if (ex != null)
             throw ex;
-
         if (fail != null) {
             if (fail instanceof com.serotonin.bacnet4j.apdu.Error)
                 throw new ErrorAPDUException((com.serotonin.bacnet4j.apdu.Error) fail);
@@ -83,14 +83,12 @@ public class ServiceFutureImpl implements ServiceFuture, ResponseConsumer {
             else if (fail instanceof Abort)
                 throw new AbortAPDUException((Abort) fail);
         }
-
         return (T) ack;
     }
 
     @Override
     public synchronized void success(final AcknowledgementService ack) {
         this.ack = ack;
-        success = true;
         complete();
     }
 

@@ -90,6 +90,11 @@ public class AtomicReadFileAck extends AcknowledgementService {
     }
 
     @Override
+    public String toString() {
+        return "AtomicReadFileAck [endOfFile=" + endOfFile + ", accessMethod=" + accessMethod + "]";
+    }
+
+    @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
@@ -146,6 +151,11 @@ public class AtomicReadFileAck extends AcknowledgementService {
 
         public OctetString getFileData() {
             return fileData;
+        }
+
+        @Override
+        public String toString() {
+            return "StreamAccessAck [fileStartPosition=" + fileStartPosition + ", fileData=" + fileData + "]";
         }
 
         @Override
@@ -215,6 +225,12 @@ public class AtomicReadFileAck extends AcknowledgementService {
 
         public SequenceOf<OctetString> getFileRecordData() {
             return fileRecordData;
+        }
+
+        @Override
+        public String toString() {
+            return "RecordAccessAck [fileStartRecord=" + fileStartRecord + ", returnedRecordCount="
+                    + returnedRecordCount + ", fileRecordData=" + fileRecordData + "]";
         }
 
         @Override

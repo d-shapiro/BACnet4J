@@ -104,4 +104,9 @@ public class UnackedMessages {
     public Map<UnackedMessageKey, UnackedMessageContext> getRequests() {
         return requests;
     }
+
+    @Override
+    public String toString() {
+        return "UnackedMessages [requests=" + requests + ", nextInvokeId=" + nextInvokeId + "]";
+    }
 }

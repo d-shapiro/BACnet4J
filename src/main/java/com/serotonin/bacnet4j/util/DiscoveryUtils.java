@@ -38,57 +38,6 @@ import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 public class DiscoveryUtils {
-    //    public static RemoteDevice discoverDevice(final LocalDevice localDevice, final int deviceId) {
-    //        // Send a WhoIs to the device. Use a listener to notify of a response so that we can return as soon as possible.
-    //        final Object lock = new Object();
-    //        final DeviceEventAdapter listener = new DeviceEventAdapter() {
-    //            @Override
-    //            public void iAmReceived(final RemoteDevice d) {
-    //                if (d.getInstanceNumber() == deviceId) {
-    //                    synchronized (lock) {
-    //                        lock.notify();
-    //                    }
-    //                }
-    //            }
-    //        };
-    //
-    //        try {
-    //            localDevice.getEventHandler().addListener(listener);
-    //
-    //            synchronized (lock) {
-    //                // Send a WhoIs for the device.
-    //                final UnsignedInteger id = new UnsignedInteger(deviceId);
-    //                localDevice.sendGlobalBroadcast(new WhoIsRequest(id, id));
-    //
-    //                try {
-    //                    lock.wait(Transport.DEFAULT_TIMEOUT);
-    //                } catch (final InterruptedException e) {
-    //                    // Ignore
-    //                }
-    //            }
-    //        } finally {
-    //            localDevice.getEventHandler().removeListener(listener);
-    //        }
-    //
-    //        // Get the device from the local.
-    //        final RemoteDevice d = localDevice.getRemoteDevice(deviceId);
-    //        if (d == null)
-    //            return null;
-    //
-    //        try {
-    //            final Map<PropertyIdentifier, Encodable> map = RequestUtils.getProperties(localDevice, d, null,
-    //                    PropertyIdentifier.protocolServicesSupported);
-    //            final Encodable e = map.get(PropertyIdentifier.protocolServicesSupported);
-    //            if (e instanceof ServicesSupported)
-    //                d.setDeviceProperty(PropertyIdentifier.protocolServicesSupported, e);
-    //            //TODO could be BACnetError here or other, should log this?
-    //        } catch (final BACnetException e) {
-    //            // ignore
-    //        }
-    //
-    //        return d;
-    //    }
-
     public static void getExtendedDeviceInformation(final LocalDevice localDevice, final RemoteDevice d)
             throws BACnetException {
         final ObjectIdentifier oid = d.getObjectIdentifier();
@@ -115,21 +64,6 @@ public class DiscoveryUtils {
                 final Encodable value = values.getNullOnError(oid, opr.getPropertyIdentifier());
                 d.setDeviceProperty(opr.getPropertyIdentifier(), value);
             });
-
-            //            d.setDeviceProperty(PropertyIdentifier.objectName,
-            //                    values.getNullOnError(oid, PropertyIdentifier.objectName));
-            //            d.setDeviceProperty(PropertyIdentifier.protocolVersion,
-            //                    values.getNullOnError(oid, PropertyIdentifier.protocolVersion));
-            //
-            //            final UnsignedInteger vendorIdentifier = (UnsignedInteger) values.getNullOnError(oid,
-            //                    PropertyIdentifier.vendorIdentifier);
-            //            if (vendorIdentifier != null)
-            //                d.setDeviceProperty(PropertyIdentifier.vendorIdentifier, vendorIdentifier);
-            //
-            //            final CharacterString modelName = (CharacterString) values.getNullOnError(oid,
-            //                    PropertyIdentifier.modelName);
-            //            if (modelName != null)
-            //                d.setDeviceProperty(PropertyIdentifier.modelName, modelName);
         }
     }
 

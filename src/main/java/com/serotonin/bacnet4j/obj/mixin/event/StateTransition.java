@@ -1,18 +1,15 @@
 package com.serotonin.bacnet4j.obj.mixin.event;
 
-import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 public class StateTransition {
     private final EventState toState;
     private final UnsignedInteger delay;
-    private final Encodable monitoredValue;
 
-    public StateTransition(final EventState toState, final UnsignedInteger delay, final Encodable monitoredValue) {
+    public StateTransition(final EventState toState, final UnsignedInteger delay) {
         this.toState = toState;
         this.delay = delay;
-        this.monitoredValue = monitoredValue;
     }
 
     public EventState getToState() {
@@ -32,7 +29,7 @@ public class StateTransition {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + (monitoredValue == null ? 0 : monitoredValue.hashCode());
+        result = prime * result + (delay == null ? 0 : delay.hashCode());
         result = prime * result + (toState == null ? 0 : toState.hashCode());
         return result;
     }
@@ -46,10 +43,10 @@ public class StateTransition {
         if (getClass() != obj.getClass())
             return false;
         final StateTransition other = (StateTransition) obj;
-        if (monitoredValue == null) {
-            if (other.monitoredValue != null)
+        if (delay == null) {
+            if (other.delay != null)
                 return false;
-        } else if (!monitoredValue.equals(other.monitoredValue))
+        } else if (!delay.equals(other.delay))
             return false;
         if (toState == null) {
             if (other.toState != null)

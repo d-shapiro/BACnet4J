@@ -156,7 +156,7 @@ public class PropertyStates extends BaseType {
     private final Choice state;
 
     public PropertyStates(final Encodable state) {
-        this.state = new Choice(choiceOptions.getContextId(state.getClass()), state, choiceOptions);
+        this.state = new Choice(choiceOptions.getContextId(state.getClass(), false), state, choiceOptions);
     }
 
     @SuppressWarnings("unchecked")

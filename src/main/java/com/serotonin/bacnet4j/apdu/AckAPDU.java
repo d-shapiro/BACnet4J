@@ -42,4 +42,9 @@ abstract public class AckAPDU extends APDU {
     public boolean isServer() {
         return true;
     }
+
+    @Override
+    public String toString() {
+        return "AckAPDU [originalInvokeId=" + originalInvokeId + "]";
+    }
 }

@@ -35,6 +35,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 
+import org.apache.commons.lang3.StringUtils;
+
 public class ByteQueue implements Cloneable {
     private byte[] queue;
     private int head = -1;
@@ -573,6 +575,13 @@ public class ByteQueue implements Cloneable {
             sb.append(',').append(Integer.toHexString(peek(i) & 0xff));
         sb.append("]");
 
+        return sb.toString();
+    }
+
+    public String toHexString() {
+        final StringBuffer sb = new StringBuffer();
+        for (int i = 0; i < size; i++)
+            sb.append(StringUtils.leftPad(Integer.toHexString(peek(i) & 0xff), 2, '0'));
         return sb.toString();
     }
 

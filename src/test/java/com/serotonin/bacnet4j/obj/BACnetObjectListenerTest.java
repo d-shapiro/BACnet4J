@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.junit.Test;
 
+import com.serotonin.bacnet4j.AbstractTest;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.service.confirmed.WritePropertyRequest;
 import com.serotonin.bacnet4j.type.Encodable;
@@ -22,13 +23,13 @@ public class BACnetObjectListenerTest extends AbstractTest {
     private MultistateValueObject mv;
 
     @Override
-    public void before() throws Exception {
+    public void afterInit() throws Exception {
         final BACnetArray<CharacterString> stateText = new BACnetArray<>( //
                 new CharacterString("Off"), //
                 new CharacterString("On"), //
                 new CharacterString("Auto"));
         mv = new MultistateValueObject(d2, 0, "mv0", 3, stateText, 1, false);
-        mv.supportCommandable(new UnsignedInteger(0));
+        mv.supportCommandable(UnsignedInteger.ZERO);
     }
 
     @Test
@@ -44,7 +45,6 @@ public class BACnetObjectListenerTest extends AbstractTest {
 
         d1.send(rd2, new WritePropertyRequest(new ObjectIdentifier(ObjectType.multiStateValue, 0),
                 PropertyIdentifier.presentValue, null, new UnsignedInteger(2), new UnsignedInteger(8))).get();
-        System.out.println(changes);
         assertEquals(2, changes.size());
         assertEquals(PropertyIdentifier.currentCommandPriority, changes.get(0).pid);
         assertEquals(new OptionalUnsigned(), changes.get(0).oldValue);

@@ -30,32 +30,39 @@ package com.serotonin.bacnet4j.service.confirmed;
 
 import java.io.IOException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
-import com.serotonin.bacnet4j.exception.NotImplementedException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.FileObject;
+import com.serotonin.bacnet4j.obj.fileAccess.FileAccess;
 import com.serotonin.bacnet4j.service.acknowledgement.AcknowledgementService;
 import com.serotonin.bacnet4j.service.acknowledgement.AtomicReadFileAck;
+import com.serotonin.bacnet4j.service.acknowledgement.AtomicReadFileAck.RecordAccessAck;
 import com.serotonin.bacnet4j.service.acknowledgement.AtomicReadFileAck.StreamAccessAck;
 import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.BaseType;
 import com.serotonin.bacnet4j.type.constructed.Choice;
 import com.serotonin.bacnet4j.type.constructed.ChoiceOptions;
+import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.BackupState;
 import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
 import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
-import com.serotonin.bacnet4j.type.enumerated.FileAccessMethod;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
+import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.SignedInteger;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
 public class AtomicReadFileRequest extends ConfirmedRequestService {
+    static final Logger LOG = LoggerFactory.getLogger(AtomicReadFileRequest.class);
+
     public static final byte TYPE_ID = 6;
 
     private static final ChoiceOptions choiceOptions = new ChoiceOptions();
@@ -95,56 +102,85 @@ public class AtomicReadFileRequest extends ConfirmedRequestService {
 
     @Override
     public AcknowledgementService handle(final LocalDevice localDevice, final Address from) throws BACnetException {
-        AtomicReadFileAck response;
+        final AtomicReadFileAck response;
 
-        BACnetObject obj;
-        FileObject file;
         try {
             // Find the file.
-            obj = localDevice.getObjectRequired(fileIdentifier);
+            final BACnetObject obj = localDevice.getObjectRequired(fileIdentifier);
             if (!(obj instanceof FileObject)) {
-                System.out.println("File access request on an object that is not a file");
-                throw new BACnetServiceException(ErrorClass.object, ErrorCode.rejectInconsistentParameters);
+                throw new BACnetServiceException(ErrorClass.services, ErrorCode.inconsistentObjectType);
             }
 
             // Check for status (backup/restore)
-            final BackupState bsOld = (BackupState) localDevice.getProperty(PropertyIdentifier.backupAndRestoreState);
+            final BackupState bsOld = (BackupState) localDevice.get(PropertyIdentifier.backupAndRestoreState);
             if (bsOld.intValue() == BackupState.preparingForBackup.intValue()
                     || bsOld.intValue() == BackupState.preparingForRestore.intValue())
                 // Send error: device configuration in progress as response
                 throw new BACnetServiceException(ErrorClass.device, ErrorCode.configurationInProgress);
 
-            file = (FileObject) obj;
+            final FileObject file = (FileObject) obj;
 
-            // Validation.
-            final boolean recordAccess = accessMethod.isa(RecordAccess.class);
-            final FileAccessMethod fileAccessMethod = (FileAccessMethod) file
-                    .getProperty(PropertyIdentifier.fileAccessMethod);
-            if (recordAccess && fileAccessMethod.equals(FileAccessMethod.streamAccess)
-                    || !recordAccess && fileAccessMethod.equals(FileAccessMethod.recordAccess))
-                throw new BACnetErrorException(getChoiceId(), ErrorClass.object, ErrorCode.invalidFileAccessMethod);
+            // Lock to ensure atomicity.
+            try {
+                file.getLock().lock();
+                final FileAccess fileAccess = file.getFileAccess();
+
+                if (accessMethod.isa(StreamAccess.class)) {
+                    if (!fileAccess.supportsStreamAccess()) {
+                        throw new BACnetServiceException(ErrorClass.services, ErrorCode.invalidFileAccessMethod);
+                    }
+
+                    final StreamAccess streamAccess = accessMethod.getDatum();
+                    final long start = streamAccess.getFileStartPosition().longValue();
+                    final long readLength = streamAccess.getRequestedOctetCount().longValue();
+                    final long fileLength = fileAccess.length();
+
+                    // Throw an exception when the following conditions are met
+                    //   - start is a negative number
+                    //   - start exceeds the length of the file object
+                    if (start < 0 || start >= fileLength) {
+                        throw new BACnetServiceException(ErrorClass.object, ErrorCode.invalidFileStartPosition);
+                    }
+
+                    final OctetString result = fileAccess.readData(start, readLength);
+
+                    response = new AtomicReadFileAck(Boolean.valueOf(fileLength <= start + readLength),
+                            new StreamAccessAck(streamAccess.getFileStartPosition(), result));
+                } else if (accessMethod.isa(RecordAccess.class)) {
+                    if (!fileAccess.supportsRecordAccess()) {
+                        throw new BACnetServiceException(ErrorClass.services, ErrorCode.invalidFileAccessMethod);
+                    }
+
+                    final RecordAccess recordAccess = accessMethod.getDatum();
+                    final long start = recordAccess.getFileStartRecord().longValue();
+                    final long readCount = recordAccess.getRequestedRecordCount().longValue();
+                    final long fileCount = fileAccess.recordCount();
+
+                    // Throw an exception when the following conditions are met
+                    //   - start is a negative number
+                    //   - start exceeds the length of the file object
+                    if (start < 0 || start >= fileAccess.recordCount()) {
+                        throw new BACnetServiceException(ErrorClass.object, ErrorCode.invalidFileStartPosition);
+                    }
+
+                    final SequenceOf<OctetString> result = fileAccess.readRecords(start,
+                            recordAccess.getRequestedRecordCount().longValue());
+
+                    response = new AtomicReadFileAck(Boolean.valueOf(fileCount <= start + readCount),
+                            new RecordAccessAck(recordAccess.getFileStartRecord(), new UnsignedInteger(result.size()),
+                                    result));
+                } else {
+                    // Should not happen
+                    throw new RuntimeException("Not implemented: " + accessMethod.getDatum());
+                }
+            } finally {
+                file.getLock().unlock();
+            }
+        } catch (final IOException e) {
+            LOG.error("File read failed for {}", this, e);
+            throw new BACnetErrorException(getChoiceId(), ErrorClass.object, ErrorCode.fileAccessDenied);
         } catch (final BACnetServiceException e) {
             throw new BACnetErrorException(getChoiceId(), e);
-        }
-
-        if (accessMethod.isa(RecordAccess.class))
-            throw new NotImplementedException();
-
-        final StreamAccess streamAccess = accessMethod.getDatum();
-        final long start = streamAccess.getFileStartPosition().longValue();
-        final long length = streamAccess.getRequestedOctetCount().longValue();
-
-        // Throw an exception when the following conditions are met
-        //   - start is a negative number
-        //   - start exceeds the length of the file object
-        if (start < 0 || start > file.length())
-            throw new BACnetErrorException(getChoiceId(), ErrorClass.object, ErrorCode.invalidFileStartPosition);
-
-        try {
-            response = new AtomicReadFileAck(new Boolean(file.length() <= start + length),
-                    new StreamAccessAck(streamAccess.getFileStartPosition(), file.readData(start, length)));
-        } catch (@SuppressWarnings("unused") final IOException e) {
-            throw new BACnetErrorException(getChoiceId(), ErrorClass.object, ErrorCode.fileAccessDenied);
         }
 
         return response;

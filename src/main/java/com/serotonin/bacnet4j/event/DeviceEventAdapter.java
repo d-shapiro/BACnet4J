@@ -31,12 +31,11 @@ package com.serotonin.bacnet4j.event;
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.RemoteObject;
 import com.serotonin.bacnet4j.obj.BACnetObject;
-import com.serotonin.bacnet4j.service.confirmed.ReinitializeDeviceRequest.ReinitializedStateOfDevice;
+import com.serotonin.bacnet4j.service.Service;
 import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.Choice;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
-import com.serotonin.bacnet4j.type.constructed.Sequence;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.constructed.TimeStamp;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
@@ -106,18 +105,12 @@ public class DeviceEventAdapter implements DeviceEventListener {
     }
 
     @Override
-    public void privateTransferReceived(final Address from, final UnsignedInteger vendorId,
-            final UnsignedInteger serviceNumber, final Sequence serviceParameters) {
-        // Override as required
-    }
-
-    @Override
-    public void reinitializeDevice(final Address from, final ReinitializedStateOfDevice reinitializedStateOfDevice) {
-        // Override as required
-    }
-
-    @Override
     public void synchronizeTime(final Address from, final DateTime dateTime, final boolean utc) {
+        // Override as required
+    }
+
+    @Override
+    public void requestReceived(final Address from, final Service service) {
         // Override as required
     }
 }

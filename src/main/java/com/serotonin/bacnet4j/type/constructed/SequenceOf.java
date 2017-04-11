@@ -35,15 +35,20 @@ import java.util.ListIterator;
 import java.util.Objects;
 
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.service.confirmed.ReadRangeRequest.RangeReadable;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
-public class SequenceOf<E extends Encodable> extends BaseType implements Iterable<E> {
+public class SequenceOf<E extends Encodable> extends BaseType implements Iterable<E>, RangeReadable<E> {
     protected final List<E> values;
 
     public SequenceOf() {
         values = new ArrayList<>();
+    }
+
+    public SequenceOf(final int capacity) {
+        values = new ArrayList<>(capacity);
     }
 
     public SequenceOf(final List<E> values) {
@@ -82,8 +87,13 @@ public class SequenceOf<E extends Encodable> extends BaseType implements Iterabl
             values.add(read(queue, clazz));
     }
 
-    public E get(final int indexBase1) {
+    public E getBase1(final int indexBase1) {
         return values.get(indexBase1 - 1);
+    }
+
+    @Override
+    public E get(final int index) {
+        return values.get(index);
     }
 
     public boolean has(final UnsignedInteger indexBase1) {
@@ -91,14 +101,23 @@ public class SequenceOf<E extends Encodable> extends BaseType implements Iterabl
         return index >= 0 && index < values.size();
     }
 
+    @Override
+    public int size() {
+        return values.size();
+    }
+
     public int getCount() {
         return values.size();
     }
 
-    public void set(final int indexBase1, final E value) {
+    public void setBase1(final int indexBase1, final E value) {
         final int index = indexBase1 - 1;
         while (values.size() <= index)
             values.add(null);
+        values.set(index, value);
+    }
+
+    public void set(final int index, final E value) {
         values.set(index, value);
     }
 
@@ -145,6 +164,10 @@ public class SequenceOf<E extends Encodable> extends BaseType implements Iterabl
                 return true;
         }
         return false;
+    }
+
+    public int indexOf(final Object value) {
+        return values.indexOf(value);
     }
 
     @Override

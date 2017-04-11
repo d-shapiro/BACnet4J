@@ -31,6 +31,7 @@ package com.serotonin.bacnet4j.service.confirmed;
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.obj.ObjectPropertyTypeDefinition;
@@ -94,33 +95,36 @@ public class RemoveListElementRequest extends ConfirmedRequestService {
     public AcknowledgementService handle(final LocalDevice localDevice, final Address from) throws BACnetException {
         final BACnetObject obj = localDevice.getObject(objectIdentifier);
         if (obj == null)
-            throw createException(ErrorClass.object, ErrorCode.unknownObject, new UnsignedInteger(0));
+            throw createException(ErrorClass.object, ErrorCode.unknownObject, UnsignedInteger.ZERO);
 
         final PropertyValue pv = new PropertyValue(propertyIdentifier, propertyArrayIndex, listOfElements, null);
         if (!localDevice.getEventHandler().checkAllowPropertyWrite(from, obj, pv))
-            throw createException(ErrorClass.property, ErrorCode.writeAccessDenied, new UnsignedInteger(0));
+            throw createException(ErrorClass.property, ErrorCode.writeAccessDenied, UnsignedInteger.ZERO);
 
         ObjectPropertyTypeDefinition def = ObjectProperties
                 .getObjectPropertyTypeDefinition(objectIdentifier.getObjectType(), propertyIdentifier);
 
-        Encodable e = obj.getProperty(propertyIdentifier);
-        if (e == null)
-            throw createException(ErrorClass.property, ErrorCode.unknownProperty, new UnsignedInteger(0));
+        Encodable e;
+        try {
+            e = obj.readPropertyRequired(propertyIdentifier);
+        } catch (final BACnetServiceException ex) {
+            throw createException(ex.getErrorClass(), ex.getErrorCode(), UnsignedInteger.ZERO);
+        }
 
         BACnetArray<Encodable> array = null;
         if (propertyArrayIndex != null) {
             // The property must be an array.
             if (!(e instanceof BACnetArray))
-                throw createException(ErrorClass.property, ErrorCode.propertyIsNotAnArray, new UnsignedInteger(0));
+                throw createException(ErrorClass.property, ErrorCode.propertyIsNotAnArray, UnsignedInteger.ZERO);
 
             array = (BACnetArray<Encodable>) e;
 
             // Check the requested index.
             final int index = propertyArrayIndex.intValue();
             if (index < 1 || index > array.getCount())
-                throw createException(ErrorClass.property, ErrorCode.invalidArrayIndex, new UnsignedInteger(0));
+                throw createException(ErrorClass.property, ErrorCode.invalidArrayIndex, UnsignedInteger.ZERO);
 
-            e = array.get(index);
+            e = array.getBase1(index);
             if (e == null)
                 // This should never happen, but check.
                 throw new RuntimeException("Array with null element: " + array);
@@ -131,14 +135,14 @@ public class RemoveListElementRequest extends ConfirmedRequestService {
 
         // The value we end up with must be a list.
         if (!(e instanceof SequenceOf))
-            throw createException(ErrorClass.services, ErrorCode.propertyIsNotAList, new UnsignedInteger(0));
+            throw createException(ErrorClass.services, ErrorCode.propertyIsNotAList, UnsignedInteger.ZERO);
         if (e instanceof BACnetArray)
-            throw createException(ErrorClass.services, ErrorCode.propertyIsNotAList, new UnsignedInteger(0));
+            throw createException(ErrorClass.services, ErrorCode.propertyIsNotAList, UnsignedInteger.ZERO);
 
         final SequenceOf<Encodable> origList = (SequenceOf<Encodable>) e;
         final SequenceOf<Encodable> list = new SequenceOf<>(origList.getValues());
         for (int i = 0; i < listOfElements.getCount(); i++) {
-            final Encodable pr = listOfElements.get(i + 1);
+            final Encodable pr = listOfElements.getBase1(i + 1);
 
             if (def != null) {
                 // If we have a property def, check it.
@@ -148,7 +152,7 @@ public class RemoveListElementRequest extends ConfirmedRequestService {
             } else {
                 // Otherwise, if there are already elements in the list, we can check against the first one.
                 if (list.getCount() > 0) {
-                    if (list.get(1).getClass() != pr.getClass()) {
+                    if (list.getBase1(1).getClass() != pr.getClass()) {
                         throw createException(ErrorClass.property, ErrorCode.invalidDataType,
                                 new UnsignedInteger(i + 1));
                     }
@@ -161,13 +165,17 @@ public class RemoveListElementRequest extends ConfirmedRequestService {
         }
 
         if (array != null) {
-            array.set(propertyArrayIndex.intValue(), origList);
+            array.setBase1(propertyArrayIndex.intValue(), origList);
             e = array;
         } else {
             e = origList;
         }
 
-        obj.writeProperty(new ValueSource(from), propertyIdentifier, e);
+        try {
+            obj.writeProperty(new ValueSource(from), propertyIdentifier, e);
+        } catch (final BACnetServiceException ex) {
+            throw createException(ex.getErrorClass(), ex.getErrorCode(), UnsignedInteger.ZERO);
+        }
 
         localDevice.getEventHandler().propertyWritten(from, obj, pv);
 

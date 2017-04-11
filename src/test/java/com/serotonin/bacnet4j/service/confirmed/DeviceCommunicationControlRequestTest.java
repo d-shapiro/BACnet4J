@@ -6,23 +6,23 @@ import static org.junit.Assert.fail;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
+import com.serotonin.bacnet4j.AbstractTest;
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.TestUtils;
+import com.serotonin.bacnet4j.event.DefaultReinitializeDeviceHandler;
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
+import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetTimeoutException;
 import com.serotonin.bacnet4j.exception.CommunicationDisabledException;
 import com.serotonin.bacnet4j.exception.ErrorAPDUException;
-import com.serotonin.bacnet4j.npdu.test.TestNetwork;
 import com.serotonin.bacnet4j.service.confirmed.DeviceCommunicationControlRequest.EnableDisable;
 import com.serotonin.bacnet4j.service.confirmed.ReinitializeDeviceRequest.ReinitializedStateOfDevice;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
-import com.serotonin.bacnet4j.transport.DefaultTransport;
+import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
 import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
@@ -31,54 +31,26 @@ import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
-import lohbihler.warp.WarpClock;
-
 /**
  * All tests modify the communication control in device d1.
  */
-public class DeviceCommunicationControlRequestTest {
-    private WarpClock clock;
-    private LocalDevice d1;
-    private LocalDevice d2;
-    private RemoteDevice rd1;
-    private RemoteDevice rd2;
-
-    @Before
-    public void before() throws Exception {
-        clock = new WarpClock();
-
-        d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 0).withTimeout(200)));
-        d1.setClock(clock);
-        d1.initialize();
-
-        d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(2, 0).withTimeout(200))).initialize();
-
-        rd1 = d2.getRemoteDeviceBlocking(1);
-        rd2 = d1.getRemoteDeviceBlocking(2);
-    }
-
-    @After
-    public void after() {
-        d1.terminate();
-        d2.terminate();
-    }
-
+public class DeviceCommunicationControlRequestTest extends AbstractTest {
     /**
      * Ensure that requests can be sent and responded when enabled by default
      */
     @Test
     public void communicationEnabled() throws BACnetException {
         // Send a request.
-        assertNull(d2.getProperty(PropertyIdentifier.description));
+        assertNull(d2.get(PropertyIdentifier.description));
         d1.send(rd2, new WritePropertyRequest(new ObjectIdentifier(ObjectType.device, 2),
                 PropertyIdentifier.description, null, new CharacterString("a"), null)).get();
-        assertEquals(new CharacterString("a"), d2.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("a"), d2.get(PropertyIdentifier.description));
 
         // Receive a request.
-        assertNull(d1.getProperty(PropertyIdentifier.description));
+        assertNull(d1.get(PropertyIdentifier.description));
         d2.send(rd1, new WritePropertyRequest(new ObjectIdentifier(ObjectType.device, 1),
                 PropertyIdentifier.description, null, new CharacterString("a"), null)).get();
-        assertEquals(new CharacterString("a"), d1.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("a"), d1.get(PropertyIdentifier.description));
     }
 
     /**
@@ -100,10 +72,10 @@ public class DeviceCommunicationControlRequestTest {
         }
 
         // Receive a request
-        assertNull(d1.getProperty(PropertyIdentifier.description));
+        assertNull(d1.get(PropertyIdentifier.description));
         d2.send(rd1, new WritePropertyRequest(new ObjectIdentifier(ObjectType.device, 1),
                 PropertyIdentifier.description, null, new CharacterString("a"), null)).get();
-        assertEquals(new CharacterString("a"), d1.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("a"), d1.get(PropertyIdentifier.description));
 
         // Sending of IAms...
         final AtomicInteger iamCount = new AtomicInteger(0);
@@ -128,10 +100,10 @@ public class DeviceCommunicationControlRequestTest {
         d2.send(rd1, new DeviceCommunicationControlRequest(null, EnableDisable.enable, null)).get();
 
         // Send a request. This time it succeeds.
-        assertNull(d2.getProperty(PropertyIdentifier.description));
+        assertNull(d2.get(PropertyIdentifier.description));
         d1.send(rd2, new WritePropertyRequest(new ObjectIdentifier(ObjectType.device, 2),
                 PropertyIdentifier.description, null, new CharacterString("a"), null)).get();
-        assertEquals(new CharacterString("a"), d2.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("a"), d2.get(PropertyIdentifier.description));
     }
 
     /**
@@ -160,29 +132,36 @@ public class DeviceCommunicationControlRequestTest {
             // Expected
         }
 
-        // Reinitialize "works", or at least returns an error.
-        try {
-            d2.send(rd1, new ReinitializeDeviceRequest(ReinitializedStateOfDevice.activateChanges, null)).get();
-            fail("ErrorAPDUException should have been thrown");
-        } catch (final ErrorAPDUException e) {
-            // Expected
-        }
+        // Start backup "works" by returning a communication disabled error.
+        TestUtils.assertErrorAPDUException(() -> {
+            d2.send(rd1, new ReinitializeDeviceRequest(ReinitializedStateOfDevice.startBackup, null)).get();
+        }, ErrorClass.services, ErrorCode.communicationDisabled);
+
+        // Reinitialize "works", or at least doesn't return an error after the proper method is overridden.
+        d1.setReinitializeDeviceHandler(new DefaultReinitializeDeviceHandler() {
+            @Override
+            protected void activateChanges(final LocalDevice localDevice, final Address from)
+                    throws BACnetErrorException {
+                // no op
+            }
+        });
+        d2.send(rd1, new ReinitializeDeviceRequest(ReinitializedStateOfDevice.activateChanges, null)).get();
 
         // Re-enable
         d2.send(rd1, new DeviceCommunicationControlRequest(null, EnableDisable.enable, null)).get();
 
         // Send a request. This time it succeeds.
-        assertNull(d2.getProperty(PropertyIdentifier.description));
+        assertNull(d2.get(PropertyIdentifier.description));
         d1.send(rd2, new WritePropertyRequest(new ObjectIdentifier(ObjectType.device, 2),
                 PropertyIdentifier.description, null, new CharacterString("a"), null)).get();
-        assertEquals(new CharacterString("a"), d2.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("a"), d2.get(PropertyIdentifier.description));
 
         // Receive a request. This time it too succeeds. Note that the value is already "a", because requests are
         // still processed, just not responded.
-        assertEquals(new CharacterString("a"), d1.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("a"), d1.get(PropertyIdentifier.description));
         d2.send(rd1, new WritePropertyRequest(new ObjectIdentifier(ObjectType.device, 1),
                 PropertyIdentifier.description, null, new CharacterString("b"), null)).get();
-        assertEquals(new CharacterString("b"), d1.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("b"), d1.get(PropertyIdentifier.description));
     }
 
     /**
@@ -207,10 +186,10 @@ public class DeviceCommunicationControlRequestTest {
 
         // Receive a request. This time it too succeeds. Note that the value is already "a", because requests are
         // still processed, just not responded.
-        assertEquals(new CharacterString("a"), d1.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("a"), d1.get(PropertyIdentifier.description));
         d2.send(rd1, new WritePropertyRequest(new ObjectIdentifier(ObjectType.device, 1),
                 PropertyIdentifier.description, null, new CharacterString("b"), null)).get();
-        assertEquals(new CharacterString("b"), d1.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("b"), d1.get(PropertyIdentifier.description));
     }
 
     /**
@@ -238,10 +217,10 @@ public class DeviceCommunicationControlRequestTest {
 
         // Receive a request. This time it too succeeds. Note that the value is already "a", because requests are
         // still processed, just not responded.
-        assertEquals(new CharacterString("a"), d1.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("a"), d1.get(PropertyIdentifier.description));
         d2.send(rd1, new WritePropertyRequest(new ObjectIdentifier(ObjectType.device, 1),
                 PropertyIdentifier.description, null, new CharacterString("b"), null)).get();
-        assertEquals(new CharacterString("b"), d1.getProperty(PropertyIdentifier.description));
+        assertEquals(new CharacterString("b"), d1.get(PropertyIdentifier.description));
     }
 
     /**
@@ -249,7 +228,7 @@ public class DeviceCommunicationControlRequestTest {
      */
     @Test
     public void password() throws BACnetException {
-        d1.setPassword("asdf");
+        d1.withPassword("asdf");
 
         // Try to disable with null
         try {

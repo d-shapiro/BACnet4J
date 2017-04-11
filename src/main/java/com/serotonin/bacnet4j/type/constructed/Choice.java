@@ -37,6 +37,7 @@ import com.serotonin.bacnet4j.type.AmbiguousValue;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.ObjectTypePropertyReference;
 import com.serotonin.bacnet4j.type.ThreadLocalObjectTypePropertyReferenceStack;
+import com.serotonin.bacnet4j.type.constructed.ChoiceOptions.ContextualType;
 import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
 import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
 import com.serotonin.bacnet4j.type.primitive.Primitive;
@@ -63,7 +64,7 @@ public class Choice extends BaseType {
     public void write(final ByteQueue queue) {
         if (contextId == -1)
             write(queue, datum);
-        else if (choiceOptions.getContextualClass(contextId) == AmbiguousValue.class)
+        else if (choiceOptions.getContextualClass(contextId).getClazz() == AmbiguousValue.class)
             writeANY(queue, datum, contextId);
         else
             write(queue, datum, contextId);
@@ -85,18 +86,23 @@ public class Choice extends BaseType {
     private void read(final ByteQueue queue) throws BACnetException {
         if (isContextTag(queue)) {
             contextId = peekTagNumber(queue);
-            final Class<? extends Encodable> clazz = choiceOptions.getContextualClass(contextId);
-            if (clazz == null) {
+            final ContextualType type = choiceOptions.getContextualClass(contextId);
+            if (type == null) {
                 LOG.warn("Could not associated choice context tag with class: {}", contextId);
                 throw new BACnetErrorException(ErrorClass.property, ErrorCode.invalidParameterDataType);
             }
 
-            if (clazz == AmbiguousValue.class) {
+            if (type.isSequence() && type.getClazz() == AmbiguousValue.class) {
+                final ObjectTypePropertyReference ref = ThreadLocalObjectTypePropertyReferenceStack.get();
+                datum = readSequenceOfANY(queue, ref.getObjectType(), ref.getPropertyIdentifier(), contextId);
+            } else if (type.isSequence()) {
+                datum = readSequenceOf(queue, type.getClazz(), contextId);
+            } else if (type.getClazz() == AmbiguousValue.class) {
                 final ObjectTypePropertyReference ref = ThreadLocalObjectTypePropertyReferenceStack.get();
                 datum = readANY(queue, ref.getObjectType(), ref.getPropertyIdentifier(), ref.getPropertyArrayIndex(),
                         contextId);
             } else {
-                datum = read(queue, clazz, contextId);
+                datum = read(queue, type.getClazz(), contextId);
             }
         } else {
             contextId = -1;

@@ -23,7 +23,7 @@
  * without being obliged to provide the source code for any proprietary components.
  *
  * See www.infiniteautomation.com for commercial license options.
- * 
+ *
  * @author Matthew Lohbihler
  */
 package com.serotonin.bacnet4j.util.sero;
@@ -31,15 +31,15 @@ package com.serotonin.bacnet4j.util.sero;
 import java.util.List;
 
 public class ArrayUtils {
-    public static String toHexString(byte[] bytes) {
+    public static String toHexString(final byte[] bytes) {
         return toHexString(bytes, 0, bytes.length);
     }
 
-    public static String toHexString(byte[] bytes, int start, int len) {
+    public static String toHexString(final byte[] bytes, final int start, final int len) {
         if (len == 0)
             return "[]";
 
-        StringBuffer sb = new StringBuffer();
+        final StringBuffer sb = new StringBuffer();
         sb.append('[');
         sb.append(Integer.toHexString(bytes[start] & 0xff));
         for (int i = 1; i < len; i++)
@@ -49,14 +49,14 @@ public class ArrayUtils {
         return sb.toString();
     }
 
-    public static String toPlainHexString(byte[] bytes) {
+    public static String toPlainHexString(final byte[] bytes) {
         return toPlainHexString(bytes, 0, bytes.length);
     }
 
-    public static String toPlainHexString(byte[] bytes, int start, int len) {
-        StringBuffer sb = new StringBuffer();
+    public static String toPlainHexString(final byte[] bytes, final int start, final int len) {
+        final StringBuffer sb = new StringBuffer();
         for (int i = 0; i < len; i++) {
-            String s = Integer.toHexString(bytes[start + i] & 0xff);
+            final String s = Integer.toHexString(bytes[start + i] & 0xff);
             if (s.length() < 2)
                 sb.append('0');
             sb.append(s);
@@ -64,15 +64,23 @@ public class ArrayUtils {
         return sb.toString();
     }
 
-    public static String toString(byte[] bytes) {
+    public static byte[] fromPlainHexString(final String s) {
+        final byte[] bytes = new byte[s.length() / 2];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = Byte.parseByte(s.substring(i * 2, i * 2 + 2), 16);
+        }
+        return bytes;
+    }
+
+    public static String toString(final byte[] bytes) {
         return toString(bytes, 0, bytes.length);
     }
 
-    public static String toString(byte[] bytes, int start, int len) {
+    public static String toString(final byte[] bytes, final int start, final int len) {
         if (len == 0)
             return "[]";
 
-        StringBuffer sb = new StringBuffer();
+        final StringBuffer sb = new StringBuffer();
         sb.append('[');
         sb.append(Integer.toString(bytes[start] & 0xff));
         for (int i = 1; i < len; i++)
@@ -82,11 +90,11 @@ public class ArrayUtils {
         return sb.toString();
     }
 
-    public static boolean isEmpty(int[] value) {
+    public static boolean isEmpty(final int[] value) {
         return value == null || value.length == 0;
     }
 
-    public static int indexOf(String[] values, String value) {
+    public static int indexOf(final String[] values, final String value) {
         if (values == null)
             return -1;
 
@@ -98,7 +106,7 @@ public class ArrayUtils {
         return -1;
     }
 
-    public static boolean containsIgnoreCase(String[] values, String value) {
+    public static boolean containsIgnoreCase(final String[] values, final String value) {
         if (values == null)
             return false;
 
@@ -110,15 +118,15 @@ public class ArrayUtils {
         return false;
     }
 
-    public static int indexOf(byte[] src, byte[] target) {
+    public static int indexOf(final byte[] src, final byte[] target) {
         return indexOf(src, 0, src.length, target);
     }
 
-    public static int indexOf(byte[] src, int len, byte[] target) {
+    public static int indexOf(final byte[] src, final int len, final byte[] target) {
         return indexOf(src, 0, len, target);
     }
 
-    public static int indexOf(byte[] src, int start, int len, byte[] target) {
+    public static int indexOf(final byte[] src, final int start, final int len, final byte[] target) {
         int pos = start;
         int i;
         boolean matched;
@@ -148,7 +156,7 @@ public class ArrayUtils {
     /**
      * Returns the value of the bits in the given range. Ranges can extend multiple bytes. No range checking is done.
      * Invalid ranges will result in {@link ArrayIndexOutOfBoundsException}.
-     * 
+     *
      * @param b
      *            the array of bytes.
      * @param offset
@@ -157,12 +165,12 @@ public class ArrayUtils {
      *            the number of bits to include in the value.
      * @return the value of the bits in the range.
      */
-    public static long bitRangeValueLong(byte[] b, int offset, int length) {
+    public static long bitRangeValueLong(final byte[] b, final int offset, final int length) {
         if (length <= 0)
             return 0;
 
-        int byteFrom = offset / 8;
-        int byteTo = (offset + length - 1) / 8;
+        final int byteFrom = offset / 8;
+        final int byteTo = (offset + length - 1) / 8;
 
         long result = b[byteFrom] & bitFromMask[offset % 8];
 
@@ -171,18 +179,18 @@ public class ArrayUtils {
             result |= b[i] & 0xff;
         }
 
-        result >>= 8 - (((offset + length - 1) % 8) + 1);
+        result >>= 8 - ((offset + length - 1) % 8 + 1);
 
         return result;
     }
 
     private static int[] bitFromMask = { 0xff, 0x7f, 0x3f, 0x1f, 0xf, 0x7, 0x3, 0x1 };
 
-    public static int bitRangeValue(byte[] b, int offset, int length) {
+    public static int bitRangeValue(final byte[] b, final int offset, final int length) {
         return (int) bitRangeValueLong(b, offset, length);
     }
 
-    public static long byteRangeValueLong(byte[] b, int offset, int length) {
+    public static long byteRangeValueLong(final byte[] b, final int offset, final int length) {
         long result = 0;
 
         for (int i = offset; i < offset + length; i++) {
@@ -193,35 +201,35 @@ public class ArrayUtils {
         return result;
     }
 
-    public static int byteRangeValue(byte[] b, int offset, int length) {
+    public static int byteRangeValue(final byte[] b, final int offset, final int length) {
         return (int) byteRangeValueLong(b, offset, length);
     }
 
-    public static int sum(int[] a) {
+    public static int sum(final int[] a) {
         int sum = 0;
         for (int i = 0; i < a.length; i++)
             sum += a[i];
         return sum;
     }
 
-    public static int[] toIntArray(List<Integer> list) {
-        int[] result = new int[list.size()];
+    public static int[] toIntArray(final List<Integer> list) {
+        final int[] result = new int[list.size()];
         for (int i = 0; i < result.length; i++)
             result[i] = list.get(i);
         return result;
     }
 
-    public static double[] toDoubleArray(List<Double> list) {
-        double[] result = new double[list.size()];
+    public static double[] toDoubleArray(final List<Double> list) {
+        final double[] result = new double[list.size()];
         for (int i = 0; i < result.length; i++)
             result[i] = list.get(i);
         return result;
     }
 
-    public static String concatenate(Object[] a, String delimiter) {
-        StringBuilder sb = new StringBuilder();
+    public static String concatenate(final Object[] a, final String delimiter) {
+        final StringBuilder sb = new StringBuilder();
         boolean first = true;
-        for (Object o : a) {
+        for (final Object o : a) {
             if (first)
                 first = false;
             else
@@ -231,7 +239,7 @@ public class ArrayUtils {
         return sb.toString();
     }
 
-    public static void shift(Object[] a, int count) {
+    public static void shift(final Object[] a, final int count) {
         if (count > 0)
             System.arraycopy(a, 0, a, count, a.length - count);
         else

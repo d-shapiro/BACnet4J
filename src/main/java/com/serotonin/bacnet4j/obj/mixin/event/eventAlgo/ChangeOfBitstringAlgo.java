@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.mixin.event.StateTransition;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.ObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
@@ -46,6 +47,7 @@ import com.serotonin.bacnet4j.type.eventParameter.ChangeOfBitString;
 import com.serotonin.bacnet4j.type.notificationParameters.ChangeOfBitStringNotif;
 import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters;
 import com.serotonin.bacnet4j.type.primitive.BitString;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 /**
@@ -58,6 +60,9 @@ public class ChangeOfBitstringAlgo extends EventAlgorithm {
 
     private final PropertyIdentifier monitoredValueProperty;
     private final PropertyIdentifier alarmValuesProperty;
+
+    private BitString lastValue;
+    private BitString lastValueCausingTransition;
 
     public ChangeOfBitstringAlgo() {
         this(null, null);
@@ -92,7 +97,8 @@ public class ChangeOfBitstringAlgo extends EventAlgorithm {
 
     @Override
     public StateTransition evaluateAlgorithmicEventState(final BACnetObject bo, final Encodable monitoredValue,
-            final AbstractEventParameter parameters) {
+            final ObjectIdentifier monitoredObjectReference,
+            final Map<ObjectPropertyReference, Encodable> additionalValues, final AbstractEventParameter parameters) {
         final ChangeOfBitString p = (ChangeOfBitString) parameters;
         return evaluateEventState( //
                 bo.get(PropertyIdentifier.eventState), //
@@ -103,7 +109,7 @@ public class ChangeOfBitstringAlgo extends EventAlgorithm {
                 bo.get(PropertyIdentifier.timeDelayNormal));
     }
 
-    public StateTransition evaluateEventState(final EventState currentState, final BitString monitoredValue,
+    private StateTransition evaluateEventState(final EventState currentState, final BitString monitoredValue,
             final SequenceOf<BitString> alarmValues, final BitString bitmask, final UnsignedInteger timeDelay,
             UnsignedInteger timeDelayNormal) {
         if (timeDelayNormal == null)
@@ -113,14 +119,24 @@ public class ChangeOfBitstringAlgo extends EventAlgorithm {
                 alarmValues);
 
         final BitString anded = monitoredValue.and(bitmask);
+        lastValue = monitoredValue;
 
         if (currentState.equals(EventState.normal) && isAlarmValue(anded, alarmValues))
-            return new StateTransition(EventState.offnormal, timeDelay, monitoredValue);
+            return new StateTransition(EventState.offnormal, timeDelay);
 
-        if (currentState.isOffNormal() && !isAlarmValue(monitoredValue, alarmValues))
-            return new StateTransition(EventState.normal, timeDelayNormal, null);
+        if (currentState.equals(EventState.offnormal) && !isAlarmValue(monitoredValue, alarmValues))
+            return new StateTransition(EventState.normal, timeDelayNormal);
+
+        if (currentState.equals(EventState.offnormal) && isAlarmValue(monitoredValue, alarmValues)
+                && !monitoredValue.equals(lastValueCausingTransition))
+            return new StateTransition(EventState.normal, timeDelayNormal);
 
         return null;
+    }
+
+    @Override
+    public void stateChangeNotify(final EventState toState) {
+        lastValueCausingTransition = lastValue;
     }
 
     private static boolean isAlarmValue(final BitString monitoredValue, final SequenceOf<BitString> alarmValues) {
@@ -134,14 +150,18 @@ public class ChangeOfBitstringAlgo extends EventAlgorithm {
     }
 
     @Override
-    public NotificationParameters getAlgorithmicNotificationParameters(final EventState fromState,
-            final EventState toState, final Encodable monitoredValue,
-            final Map<PropertyIdentifier, Encodable> additionalValues, final AbstractEventParameter parameters) {
-        return getNotificationParameters((StatusFlags) additionalValues.get(PropertyIdentifier.statusFlags),
+    public NotificationParameters getAlgorithmicNotificationParameters(final BACnetObject bo,
+            final EventState fromState, final EventState toState, final Encodable monitoredValue,
+            final ObjectIdentifier monitoredObjectReference,
+            final Map<ObjectPropertyReference, Encodable> additionalValues, final AbstractEventParameter parameters) {
+        return getNotificationParameters(
+                (StatusFlags) additionalValues
+                        .get(new ObjectPropertyReference(monitoredObjectReference, PropertyIdentifier.statusFlags)),
                 (BitString) monitoredValue);
     }
 
-    public NotificationParameters getNotificationParameters(StatusFlags statusFlags, final BitString monitoredValue) {
+    private static NotificationParameters getNotificationParameters(StatusFlags statusFlags,
+            final BitString monitoredValue) {
         if (statusFlags == null)
             statusFlags = new StatusFlags(false, false, false, false);
 

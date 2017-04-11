@@ -2,13 +2,12 @@ package com.serotonin.bacnet4j.obj.mixin.event;
 
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.exception.BACnetException;
-import com.serotonin.bacnet4j.exception.BACnetRuntimeException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.AbstractMixin;
 import com.serotonin.bacnet4j.obj.BACnetObject;
@@ -28,6 +27,7 @@ import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.constructed.BACnetArray;
 import com.serotonin.bacnet4j.type.constructed.DateTime;
 import com.serotonin.bacnet4j.type.constructed.Destination;
+import com.serotonin.bacnet4j.type.constructed.DeviceObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.constructed.RecipientProcess;
@@ -63,6 +63,7 @@ abstract public class EventReportingMixin extends AbstractMixin {
     private final EventAlgorithm eventAlgo;
     private final FaultAlgorithm faultAlgo;
     private final CORPropertyValueProducer[] changeOfReliabilityProperties;
+    private Consumer<NotificationParameters> postNotificationAction;
 
     // Runtime
     private Delayer delayer;
@@ -76,10 +77,10 @@ abstract public class EventReportingMixin extends AbstractMixin {
         changeOfReliabilityProperties = getCORProperties(bo.getId().getObjectType());
 
         // Check that the notification object with the given instance number exists.
-        final UnsignedInteger ncId = bo.get(PropertyIdentifier.notificationClass);
-        final ObjectIdentifier ncOid = new ObjectIdentifier(ObjectType.notificationClass, ncId.intValue());
-        if (getLocalDevice().getObject(ncOid) == null)
-            throw new BACnetRuntimeException("Notification class with id " + ncId + " does not exist");
+        //        final UnsignedInteger ncId = bo.get(PropertyIdentifier.notificationClass);
+        //        final ObjectIdentifier ncOid = new ObjectIdentifier(ObjectType.notificationClass, ncId.intValue());
+        //        if (getLocalDevice().getObject(ncOid) == null)
+        //            throw new BACnetRuntimeException("Notification class with id " + ncId + " does not exist");
 
         // Defaulted properties
         bo.writePropertyInternal(PropertyIdentifier.ackedTransitions, new EventTransitionBits(true, true, true));
@@ -90,7 +91,11 @@ abstract public class EventReportingMixin extends AbstractMixin {
         bo.writePropertyInternal(PropertyIdentifier.eventMessageTextsConfig,
                 new BACnetArray<>(CharacterString.EMPTY, CharacterString.EMPTY, CharacterString.EMPTY));
         //ee.writePropertyImpl(PropertyIdentifier.eventAlgorithmInhibitRef, new ObjectPropertyReference()); Not supported
-        bo.writePropertyInternal(PropertyIdentifier.eventAlgorithmInhibit, new Boolean(false));
+        bo.writePropertyInternal(PropertyIdentifier.eventAlgorithmInhibit, Boolean.FALSE);
+    }
+
+    public void setPostNotificationAction(final Consumer<NotificationParameters> postNotificationAction) {
+        this.postNotificationAction = postNotificationAction;
     }
 
     abstract protected StateTransition evaluateEventState(BACnetObject bo, EventAlgorithm eventAlgo);
@@ -129,10 +134,10 @@ abstract public class EventReportingMixin extends AbstractMixin {
                 final Reliability reli = (Reliability) newValue;
                 if (!reli.equals(Reliability.noFaultDetected))
                     // Fault detected. Do an immediate state change to fault.
-                    doStateTransition(EventState.fault);
+                    doStateTransitionInternal(EventState.fault);
                 else if (!newValue.equals(oldValue)) {
                     // No fault detected. Do an immediate state change to normal.
-                    doStateTransition(EventState.normal);
+                    doStateTransitionInternal(EventState.normal);
                     // Now call the event algorithm in case we need a change to offnormal.
                     executeEventAlgo();
                 }
@@ -145,7 +150,7 @@ abstract public class EventReportingMixin extends AbstractMixin {
                 final Boolean eai = (Boolean) newValue;
                 if (eai.booleanValue())
                     // Inhibited. Update the event state immediately to normal.
-                    doStateTransition(EventState.normal);
+                    doStateTransitionInternal(EventState.normal);
                 else
                     // Uninhibited.
                     executeEventAlgo();
@@ -156,7 +161,7 @@ abstract public class EventReportingMixin extends AbstractMixin {
     protected void updateEventState(final StateTransition transition) {
         if (transition.getDelay() == null)
             // Do an immediate state transition.
-            doStateTransition(transition.getToState());
+            doStateTransitionInternal(transition.getToState());
         else {
             synchronized (this) {
                 if (delayer != null && delayer.transition.equals(transition))
@@ -199,6 +204,13 @@ abstract public class EventReportingMixin extends AbstractMixin {
         return false;
     }
 
+    private void doStateTransitionInternal(final EventState toState) {
+        // Notify the algo of the state change.
+        eventAlgo.stateChangeNotify(toState);
+
+        doStateTransition(toState);
+    }
+
     protected void doStateTransition(final EventState toState) {
         final EventState fromState = get(PropertyIdentifier.eventState);
         LOG.debug("Event state changing from {} to {}", fromState, toState);
@@ -211,12 +223,12 @@ abstract public class EventReportingMixin extends AbstractMixin {
         //
         writePropertyInternal(PropertyIdentifier.eventState, toState);
 
-        final TimeStamp now = new TimeStamp(new DateTime());
+        final TimeStamp now = new TimeStamp(new DateTime(getLocalDevice()));
 
         BACnetArray<TimeStamp> ets = get(PropertyIdentifier.eventTimeStamps);
         // Make a copy in which to make the change so that the write property method works properly.
         ets = new BACnetArray<>(ets);
-        ets.set(toState.getTransitionIndex(), now);
+        ets.setBase1(toState.getTransitionIndex(), now);
         writePropertyInternal(PropertyIdentifier.eventTimeStamps, ets);
 
         // Not implemented
@@ -227,6 +239,10 @@ abstract public class EventReportingMixin extends AbstractMixin {
         final UnsignedInteger ncId = get(PropertyIdentifier.notificationClass);
         final BACnetObject nc = getLocalDevice()
                 .getObject(new ObjectIdentifier(ObjectType.notificationClass, ncId.intValue()));
+        if (nc == null) {
+            LOG.info("Notification class with id {} does not exist. Aborting state transition processing.", ncId);
+            return;
+        }
 
         final boolean isAckRequired;
         if (updateAckedTransitions()) {
@@ -263,7 +279,7 @@ abstract public class EventReportingMixin extends AbstractMixin {
             final BACnetArray<UnsignedInteger> priority = nc.get(PropertyIdentifier.priority);
 
             EventType eventType;
-            NotificationParameters eventValues;
+            NotificationParameters notifParams;
             if (fromState.equals(EventState.fault) || toState.equals(EventState.fault)) {
                 eventType = EventType.changeOfReliability;
 
@@ -275,17 +291,17 @@ abstract public class EventReportingMixin extends AbstractMixin {
                         propertyValues.add(propertyValue);
                 }
 
-                eventValues = new NotificationParameters(new ChangeOfReliabilityNotif( //
+                notifParams = new NotificationParameters(new ChangeOfReliabilityNotif( //
                         (Reliability) get(PropertyIdentifier.reliability), //
                         (StatusFlags) get(PropertyIdentifier.statusFlags), //
                         propertyValues));
             } else {
                 eventType = getEventType(eventAlgo);
-                eventValues = getNotificationParameters(fromState, toState, bo, eventAlgo);
+                notifParams = getNotificationParameters(fromState, toState, bo, eventAlgo);
             }
 
             sendNotifications(recipientList, now, nc, priority, toState, eventType, null, notifyType, //
-                    new Boolean(isAckRequired), fromState, eventValues);
+                    Boolean.valueOf(isAckRequired), fromState, notifParams);
         }
     }
 
@@ -311,7 +327,7 @@ abstract public class EventReportingMixin extends AbstractMixin {
             LOG.debug("Timer completed for transition {}", transition);
             synchronized (EventReportingMixin.this) {
                 delayer = null;
-                doStateTransition(transition.getToState());
+                doStateTransitionInternal(transition.getToState());
             }
         }
 
@@ -325,57 +341,54 @@ abstract public class EventReportingMixin extends AbstractMixin {
     private void sendNotifications(final SequenceOf<Destination> recipientList, final TimeStamp timeStamp,
             final BACnetObject nc, final BACnetArray<UnsignedInteger> priority, final EventState toState,
             final EventType eventType, final CharacterString messageText, final NotifyType notifyType,
-            final Boolean ackRequired, final EventState fromState, final NotificationParameters eventValues) {
+            final Boolean ackRequired, final EventState fromState, final NotificationParameters notifParams) {
+        final ObjectIdentifier initiatingDeviceIdentifier = getLocalDevice().getId();
+        final ObjectIdentifier eventObjectIdentifier = (ObjectIdentifier) get(PropertyIdentifier.objectIdentifier);
+        final UnsignedInteger notificationClass = (UnsignedInteger) nc.get(PropertyIdentifier.notificationClass);
+        final UnsignedInteger priorityNum = priority.getBase1(toState.getTransitionIndex());
+
         for (final Destination destination : recipientList) {
             if (destination.isSuitableForEvent(timeStamp, toState)) {
                 Address address;
-                if (destination.getRecipient().isAddress())
-                    address = destination.getRecipient().getAddress();
-                else {
-                    final int deviceId = destination.getRecipient().getDevice().getInstanceNumber();
-                    try {
-                        final RemoteDevice rd = getLocalDevice().getRemoteDevice(deviceId).get();
-                        address = rd.getAddress();
-                    } catch (final BACnetException e) {
-                        LOG.warn("Unknown device id {}, send failed", deviceId, e);
-                        continue;
-                    }
+                try {
+                    address = destination.getRecipient().toAddress(getLocalDevice());
+                } catch (final BACnetException e) {
+                    LOG.warn("Failed to get address for recipient {}", destination.getRecipient(), e);
+                    continue;
                 }
 
                 LOG.debug("Sending {} to {}", notifyType, destination.getRecipient());
 
                 final UnsignedInteger processIdentifier = destination.getProcessIdentifier();
-                final ObjectIdentifier initiatingDeviceIdentifier = getLocalDevice().getId();
-                final ObjectIdentifier eventObjectIdentifier = (ObjectIdentifier) get(
-                        PropertyIdentifier.objectIdentifier);
-                final UnsignedInteger notificationClass = (UnsignedInteger) nc
-                        .get(PropertyIdentifier.notificationClass);
-                final UnsignedInteger priorityNum = priority.get(toState.getTransitionIndex());
 
                 if (destination.getIssueConfirmedNotifications().booleanValue()) {
                     // Confirmed notification
                     final ConfirmedEventNotificationRequest req = new ConfirmedEventNotificationRequest(
                             processIdentifier, initiatingDeviceIdentifier, eventObjectIdentifier, timeStamp,
                             notificationClass, priorityNum, eventType, messageText, notifyType, ackRequired, fromState,
-                            toState, eventValues);
+                            toState, notifParams);
                     getLocalDevice().send(address, req, null);
                 } else {
                     // Unconfirmed notification
                     final UnconfirmedEventNotificationRequest req = new UnconfirmedEventNotificationRequest(
                             processIdentifier, initiatingDeviceIdentifier, eventObjectIdentifier, timeStamp,
                             notificationClass, priorityNum, eventType, messageText, notifyType, ackRequired, fromState,
-                            toState, eventValues);
+                            toState, notifParams);
                     getLocalDevice().send(address, req);
                 }
-
-                // Internal (proprietary) handling of notifications for NotificationClass objects.
-                // If the nc is a NotificationClassObject, provide notification to it directly as well.
-                if (nc instanceof NotificationClassObject) {
-                    final NotificationClassObject nco = (NotificationClassObject) nc;
-                    nco.fireEventNotification(eventObjectIdentifier, timeStamp, notificationClass, priorityNum,
-                            eventType, messageText, notifyType, ackRequired, fromState, toState, eventValues);
-                }
             }
+        }
+
+        // Internal (proprietary) handling of notifications for NotificationClass objects.
+        // If the nc is a NotificationClassObject, provide notification to it directly as well.
+        if (nc instanceof NotificationClassObject) {
+            final NotificationClassObject nco = (NotificationClassObject) nc;
+            nco.fireEventNotification(eventObjectIdentifier, timeStamp, notificationClass, priorityNum, eventType,
+                    messageText, notifyType, ackRequired, fromState, toState, notifParams);
+        }
+
+        if (postNotificationAction != null) {
+            postNotificationAction.accept(notifParams);
         }
     }
 
@@ -391,7 +404,7 @@ abstract public class EventReportingMixin extends AbstractMixin {
                 timeOfAcknowledgment);
         // Verify that the timestamp for the given acknowledgement matches.
         final BACnetArray<TimeStamp> ets = get(PropertyIdentifier.eventTimeStamps);
-        final TimeStamp ts = ets.get(eventStateAcknowledged.getTransitionIndex());
+        final TimeStamp ts = ets.getBase1(eventStateAcknowledged.getTransitionIndex());
         if (!timeStamp.equals(ts))
             throw new BACnetServiceException(ErrorClass.services, ErrorCode.invalidTimeStamp);
 
@@ -491,7 +504,7 @@ abstract public class EventReportingMixin extends AbstractMixin {
             final BACnetObject nc = getLocalDevice()
                     .getObject(new ObjectIdentifier(ObjectType.notificationClass, ncId.intValue()));
             final BACnetArray<UnsignedInteger> priorities = nc.get(PropertyIdentifier.priority);
-            final UnsignedInteger priority = priorities.get(eventState.getTransitionIndex());
+            final UnsignedInteger priority = priorities.getBase1(eventState.getTransitionIndex());
 
             boolean include = true;
 
@@ -592,6 +605,18 @@ abstract public class EventReportingMixin extends AbstractMixin {
         }
     }
 
+    private static class EventEnrollmentMonitoredReferencedPropertyProducer extends CORPropertyValueProducer {
+        public EventEnrollmentMonitoredReferencedPropertyProducer(final PropertyIdentifier pid) {
+            super(pid);
+        }
+
+        @Override
+        PropertyValue get(final EventReportingMixin mixin) {
+            final DeviceObjectPropertyReference reference = mixin.get(pid);
+            return mixin.getEventEnrollmentMonitoredProperty(reference.getPropertyIdentifier());
+        }
+    }
+
     private static class NotImplementedProducer extends CORPropertyValueProducer {
         public NotImplementedProducer(final PropertyIdentifier pid) {
             super(pid);
@@ -622,6 +647,11 @@ abstract public class EventReportingMixin extends AbstractMixin {
             };
 
         if (ObjectType.accessZone.equals(objectType))
+            return new CORPropertyValueProducer[] { //
+                    new ObjectCORProperyProducer(PropertyIdentifier.occupancyState), //
+            };
+
+        if (ObjectType.accumulator.equals(objectType))
             return new CORPropertyValueProducer[] { //
                     new ObjectCORProperyProducer(PropertyIdentifier.pulseRate), //
                     new ObjectCORProperyProducer(PropertyIdentifier.presentValue), //
@@ -669,7 +699,7 @@ abstract public class EventReportingMixin extends AbstractMixin {
         if (ObjectType.eventEnrollment.equals(objectType))
             return new CORPropertyValueProducer[] { //
                     new ObjectCORProperyProducer(PropertyIdentifier.objectPropertyReference), //
-                    new EventEnrollmentMonitoredPropertyProducer(null), //
+                    new EventEnrollmentMonitoredReferencedPropertyProducer(PropertyIdentifier.objectPropertyReference), //
                     new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.reliability), //
                     new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.statusFlags), //
             };
@@ -693,25 +723,25 @@ abstract public class EventReportingMixin extends AbstractMixin {
         if (ObjectType.loop.equals(objectType))
             return new CORPropertyValueProducer[] { //
                     new ObjectCORProperyProducer(PropertyIdentifier.presentValue), //
-                    new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.controlledVariableValue), //
-                    new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.setpoint), //
+                    new ObjectCORProperyProducer(PropertyIdentifier.controlledVariableValue), //
+                    new ObjectCORProperyProducer(PropertyIdentifier.setpoint), //
             };
 
         if (ObjectType.program.equals(objectType))
             return new CORPropertyValueProducer[] { //
                     new ObjectCORProperyProducer(PropertyIdentifier.programState), //
-                    new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.controlledVariableValue), //
-                    new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.descriptionOfHalt), //
+                    new ObjectCORProperyProducer(PropertyIdentifier.controlledVariableValue), //
+                    new ObjectCORProperyProducer(PropertyIdentifier.descriptionOfHalt), //
             };
 
         if (ObjectType.timer.equals(objectType))
             return new CORPropertyValueProducer[] { //
                     new ObjectCORProperyProducer(PropertyIdentifier.presentValue), //
                     new ObjectCORProperyProducer(PropertyIdentifier.timerState), //
-                    new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.updateTime), //
-                    new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.lastStateChange), //
-                    new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.initialTimeout), //
-                    new EventEnrollmentMonitoredPropertyProducer(PropertyIdentifier.expirationTime), //
+                    new ObjectCORProperyProducer(PropertyIdentifier.updateTime), //
+                    new ObjectCORProperyProducer(PropertyIdentifier.lastStateChange), //
+                    new ObjectCORProperyProducer(PropertyIdentifier.initialTimeout), //
+                    new ObjectCORProperyProducer(PropertyIdentifier.expirationTime), //
             };
 
         return new CORPropertyValueProducer[] {};

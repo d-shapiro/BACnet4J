@@ -10,6 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.After;
@@ -23,8 +24,12 @@ import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
+import lohbihler.warp.WarpClock;
+
 public class BBMDTest {
     static final int port = 0xBAC0;
+
+    private final WarpClock clock = new WarpClock();
 
     LDInfo ld11, ld12, ld13;
     LDInfo ld21, ld22, ld23;
@@ -92,7 +97,7 @@ public class BBMDTest {
         ld11.ld.sendLocalBroadcast(ld11.ld.getIAm());
         ld12.ld.sendLocalBroadcast(ld12.ld.getIAm());
         ld33.ld.sendLocalBroadcast(new WhoIsRequest());
-        Thread.sleep(200);
+        clock.plus(400, TimeUnit.MILLISECONDS, 600);
 
         // Confirm that the above broadcasts were only received on their subnets.
         assertEquals(1, ld11.iamCount()); // IAm from 12
@@ -128,12 +133,18 @@ public class BBMDTest {
     public void fdt() throws Exception {
         final InetSocketAddress target = ld11.network.getLocalBindAddress();
 
+        // Set the clock.
+        clock.plus(1, TimeUnit.SECONDS, 20);
+
         // PART 1
         // Write FD registrations
         fd151.network.registerAsForeignDevice(target, 3);
         fd152.network.registerAsForeignDevice(target, 30);
         fd153.network.registerAsForeignDevice(target, 300);
         Thread.sleep(100);
+
+        // Advance the clock one second.
+        clock.plus(1, TimeUnit.SECONDS, 20);
 
         // Read registrations
         configurer.send(packet(6, "", ld11));
@@ -167,11 +178,11 @@ public class BBMDTest {
         // Verify that it is there
         configurer.send(packet(6, "", ld11));
         configurer.receive(response);
-        assertPacketEquals("810700227F009701BAC0000300207F009801BAC0001E003B7F009901BAC00001001E", response);
+        assertPacketEquals("810700227F009701BAC0000300207F009801BAC0001E003B7F009901BAC00001001F", response);
 
         // Wait for the manual entry to expire.
-        System.out.println("Waiting for the manual entry to expire");
-        Thread.sleep(42000); // The TTL was 1s, plus 30s grace, and the expiry thread runs every 10s.
+        // Advance the clock 42 seconds. The TTL was 1s, plus 30s grace, and the expiry thread runs every 10s.
+        clock.plus(42, TimeUnit.SECONDS, 1, TimeUnit.SECONDS, 10, 20);
 
         // Read registrations again
         configurer.send(packet(6, "", ld11));
@@ -223,7 +234,7 @@ public class BBMDTest {
         fd151.network.registerAsForeignDevice(ld11.network.getLocalBindAddress(), 5000);
         fd152.network.registerAsForeignDevice(ld11.network.getLocalBindAddress(), 5000);
         fd153.network.registerAsForeignDevice(ld22.network.getLocalBindAddress(), 5000);
-        Thread.sleep(100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 100);
 
         // ********** TEST 1 **********
         // ***** Send a broadcast from 127.0.1.1 *****
@@ -242,7 +253,7 @@ public class BBMDTest {
         //   - 127.0.1.2 (original)
         //   - 127.0.1.3 (original)
         ld11.ld.sendLocalBroadcast(ld11.ld.getIAm());
-        Thread.sleep(100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 100);
 
         // Confirm that the broadcast was received across the B/N network
         assertEquals(0, ld11.iamCount());
@@ -261,7 +272,7 @@ public class BBMDTest {
 
         // ********** TEST 2 **********
         ld12.ld.sendLocalBroadcast(ld12.ld.getIAm());
-        Thread.sleep(100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 100);
 
         // Confirm that the broadcast was received across the B/N network
         assertEquals(1, ld11.iamCount());
@@ -280,7 +291,7 @@ public class BBMDTest {
 
         // ********** TEST 3 **********
         ld21.ld.sendLocalBroadcast(ld21.ld.getIAm());
-        Thread.sleep(100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 100);
 
         // Confirm that the broadcast was received across the B/N network
         assertEquals(1, ld11.iamCount());
@@ -299,7 +310,7 @@ public class BBMDTest {
 
         // ********** TEST 4 **********
         ld22.ld.sendLocalBroadcast(ld22.ld.getIAm());
-        Thread.sleep(100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 100);
 
         // Confirm that the broadcast was received across the B/N network
         assertEquals(1, ld11.iamCount());
@@ -318,7 +329,7 @@ public class BBMDTest {
 
         // ********** TEST 5 **********
         ld31.ld.sendLocalBroadcast(ld31.ld.getIAm());
-        Thread.sleep(100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 100);
 
         // Confirm that the broadcast was received across the B/N network
         assertEquals(1, ld11.iamCount());
@@ -346,7 +357,7 @@ public class BBMDTest {
         //     - 127.0.3.2 (forward)
         //     - 127.0.3.3 (forward)
         fd152.ld.sendLocalBroadcast(fd152.ld.getIAm());
-        Thread.sleep(100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 100);
 
         // Confirm that the broadcast was received across the B/N network
         assertEquals(1, ld11.iamCount());
@@ -374,7 +385,7 @@ public class BBMDTest {
         //     - 127.0.3.2 (forward)
         //     - 127.0.3.3 (forward)
         fd153.ld.sendLocalBroadcast(fd153.ld.getIAm());
-        Thread.sleep(100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 100);
 
         // Confirm that the broadcast was received across the B/N network
         assertEquals(0, ld11.iamCount());
@@ -439,8 +450,9 @@ public class BBMDTest {
                 .withLocalNetworkNumber(1) //
                 .build();
 
-        info.ld = new LocalDevice(subnet * 10 + addr, new DefaultTransport(info.network));
-        info.ld.initialize();
+        info.ld = new LocalDevice(subnet * 10 + addr, new DefaultTransport(info.network)) //
+                .withClock(clock) //
+                .initialize();
 
         info.iamCount = new MutableInt();
 

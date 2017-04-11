@@ -87,6 +87,8 @@ abstract public class Network {
 
     abstract public Address[] getAllLocalAddresses();
 
+    abstract public Address getLoopbackAddress();
+
     public final void sendAPDU(final Address recipient, final OctetString router, final APDU apdu,
             final boolean broadcast) throws BACnetException {
         final ByteQueue npdu = new ByteQueue();

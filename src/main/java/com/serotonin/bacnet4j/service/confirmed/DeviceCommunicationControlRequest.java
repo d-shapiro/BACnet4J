@@ -31,8 +31,7 @@ package com.serotonin.bacnet4j.service.confirmed;
 import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.apache.commons.lang3.StringUtils;
+import java.util.Objects;
 
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetErrorException;
@@ -68,11 +67,12 @@ public class DeviceCommunicationControlRequest extends ConfirmedRequestService {
 
     @Override
     public AcknowledgementService handle(final LocalDevice localDevice, final Address from) throws BACnetException {
-        if (!StringUtils.isBlank(localDevice.getPassword())) {
-            // Validate the password
-            if (password == null || !localDevice.getPassword().equals(password.toString())) {
-                throw new BACnetErrorException(getChoiceId(), ErrorClass.security, ErrorCode.passwordFailure);
-            }
+        String givenPassword = null;
+        if (password != null)
+            givenPassword = password.getValue();
+
+        if (!Objects.equals(givenPassword, localDevice.getPassword())) {
+            throw new BACnetErrorException(getChoiceId(), ErrorClass.security, ErrorCode.passwordFailure);
         }
 
         int minutes = 0;

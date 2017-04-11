@@ -42,48 +42,74 @@ import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
 public class LogData extends BaseType {
-    private final LogStatus logStatus;
-    private final SequenceOf<LogDataElement> logData;
-    private final Real timeChange;
+    private static ChoiceOptions choiceOptions = new ChoiceOptions();
+    static {
+        choiceOptions.addContextual(0, LogStatus.class);
+        choiceOptions.addContextualSequence(1, LogDataElement.class);
+        choiceOptions.addContextual(2, Real.class);
+    }
 
-    public LogData(final LogStatus logStatus, final SequenceOf<LogDataElement> logData, final Real timeChange) {
-        this.logStatus = logStatus;
-        this.logData = logData;
-        this.timeChange = timeChange;
+    private final Choice choice;
+
+    public LogData(final LogStatus datum) {
+        choice = new Choice(0, datum, choiceOptions);
+    }
+
+    public LogData(final SequenceOf<LogDataElement> datum) {
+        choice = new Choice(1, datum, choiceOptions);
+    }
+
+    public LogData(final Real datum) {
+        choice = new Choice(2, datum, choiceOptions);
     }
 
     @Override
     public void write(final ByteQueue queue) {
-        write(queue, logStatus, 0);
-        write(queue, logData, 1);
-        write(queue, timeChange, 2);
-    }
-
-    public LogStatus getLogStatus() {
-        return logStatus;
-    }
-
-    public SequenceOf<LogDataElement> getLogData() {
-        return logData;
-    }
-
-    public Real getTimeChange() {
-        return timeChange;
+        write(queue, choice);
     }
 
     public LogData(final ByteQueue queue) throws BACnetException {
-        logStatus = read(queue, LogStatus.class, 0);
-        logData = readSequenceOf(queue, LogDataElement.class, 1);
-        timeChange = read(queue, Real.class, 2);
+        choice = readChoice(queue, choiceOptions);
+    }
+
+    public boolean isLogStatus() {
+        return choice.getContextId() == 0;
+    }
+
+    public LogStatus getLogStatus() {
+        return choice.getDatum();
+    }
+
+    public boolean isLogData() {
+        return choice.getContextId() == 1;
+    }
+
+    public SequenceOf<LogDataElement> getData() {
+        return choice.getDatum();
+    }
+
+    public boolean isTimeChange() {
+        return choice.getContextId() == 2;
+    }
+
+    public Real getTimeChange() {
+        return choice.getDatum();
+    }
+
+    public <T extends Encodable> T getDatum() {
+        return choice.getDatum();
+    }
+
+    @Override
+    public String toString() {
+        return "LogData [choice=" + choice + "]";
     }
 
     @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + (logData == null ? 0 : logData.hashCode());
-        result = prime * result + (logStatus == null ? 0 : logStatus.hashCode());
-        result = prime * result + (timeChange == null ? 0 : timeChange.hashCode());
+        result = prime * result + (choice == null ? 0 : choice.hashCode());
         return result;
     }
 
@@ -96,25 +122,38 @@ public class LogData extends BaseType {
         if (getClass() != obj.getClass())
             return false;
         final LogData other = (LogData) obj;
-        if (logData == null) {
-            if (other.logData != null)
+        if (choice == null) {
+            if (other.choice != null)
                 return false;
-        } else if (!logData.equals(other.logData))
-            return false;
-        if (logStatus == null) {
-            if (other.logStatus != null)
-                return false;
-        } else if (!logStatus.equals(other.logStatus))
-            return false;
-        if (timeChange == null) {
-            if (other.timeChange != null)
-                return false;
-        } else if (!timeChange.equals(other.timeChange))
+        } else if (!choice.equals(other.choice))
             return false;
         return true;
     }
 
     public static class LogDataElement extends BaseType {
+        /**
+         * Method to ensure that the log record gets created with the correct context id.
+         */
+        public static LogDataElement createFromMonitoredValue(final Encodable value) {
+            if (value instanceof Boolean)
+                return new LogDataElement((Boolean) value);
+            if (value instanceof Real)
+                return new LogDataElement((Real) value);
+            if (value instanceof Enumerated)
+                return new LogDataElement((Enumerated) value);
+            if (value instanceof UnsignedInteger)
+                return new LogDataElement((UnsignedInteger) value);
+            if (value instanceof SignedInteger)
+                return new LogDataElement((SignedInteger) value);
+            if (value instanceof BitString)
+                return new LogDataElement((BitString) value);
+            if (value instanceof Null)
+                return new LogDataElement((Null) value);
+            if (value instanceof ErrorClassAndCode)
+                return new LogDataElement((ErrorClassAndCode) value);
+            return new LogDataElement(value);
+        }
+
         private static ChoiceOptions choiceOptions = new ChoiceOptions();
         static {
             choiceOptions.addContextual(0, Boolean.class);
@@ -175,40 +214,49 @@ public class LogData extends BaseType {
             choice = readChoice(queue, choiceOptions);
         }
 
-        public Boolean getBoolean() {
+        public boolean isBoolean() {
+            return choice.getContextId() == 0;
+        }
+
+        public boolean isReal() {
+            return choice.getContextId() == 1;
+        }
+
+        public boolean isEnumerated() {
+            return choice.getContextId() == 2;
+        }
+
+        public boolean isUnsignedInteger() {
+            return choice.getContextId() == 3;
+        }
+
+        public boolean isSignedInteger() {
+            return choice.getContextId() == 4;
+        }
+
+        public boolean isBitString() {
+            return choice.getContextId() == 5;
+        }
+
+        public boolean isNull() {
+            return choice.getContextId() == 6;
+        }
+
+        public boolean isBACnetError() {
+            return choice.getContextId() == 7;
+        }
+
+        public boolean isAny() {
+            return choice.getContextId() == 8;
+        }
+
+        public <T extends Encodable> T getDatum() {
             return choice.getDatum();
         }
 
-        public Real getReal() {
-            return choice.getDatum();
-        }
-
-        public Enumerated getEnumerated() {
-            return choice.getDatum();
-        }
-
-        public UnsignedInteger getUnsignedInteger() {
-            return choice.getDatum();
-        }
-
-        public SignedInteger getSignedInteger() {
-            return choice.getDatum();
-        }
-
-        public BitString getBitString() {
-            return choice.getDatum();
-        }
-
-        public Null getNull() {
-            return choice.getDatum();
-        }
-
-        public ErrorClassAndCode getBACnetError() {
-            return choice.getDatum();
-        }
-
-        public BaseType getAny() {
-            return choice.getDatum();
+        @Override
+        public String toString() {
+            return "LogDataElement [choice=" + choice + "]";
         }
 
         @Override

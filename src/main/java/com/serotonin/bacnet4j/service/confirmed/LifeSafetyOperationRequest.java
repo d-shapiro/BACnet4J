@@ -29,10 +29,15 @@
 package com.serotonin.bacnet4j.service.confirmed;
 
 import com.serotonin.bacnet4j.LocalDevice;
+import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
-import com.serotonin.bacnet4j.exception.NotImplementedException;
+import com.serotonin.bacnet4j.exception.BACnetServiceException;
+import com.serotonin.bacnet4j.obj.BACnetObject;
+import com.serotonin.bacnet4j.obj.LifeSafety;
 import com.serotonin.bacnet4j.service.acknowledgement.AcknowledgementService;
 import com.serotonin.bacnet4j.type.constructed.Address;
+import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
+import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
 import com.serotonin.bacnet4j.type.enumerated.LifeSafetyOperation;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
@@ -63,7 +68,28 @@ public class LifeSafetyOperationRequest extends ConfirmedRequestService {
 
     @Override
     public AcknowledgementService handle(final LocalDevice localDevice, final Address from) throws BACnetException {
-        throw new NotImplementedException();
+        try {
+            if (objectIdentifier != null) {
+                final BACnetObject bo = localDevice.getObjectRequired(objectIdentifier);
+                handleForObject(from, bo, true);
+            } else {
+                for (final BACnetObject bo : localDevice.getLocalObjects()) {
+                    handleForObject(from, bo, false);
+                }
+            }
+        } catch (final BACnetServiceException e) {
+            throw new BACnetErrorException(getChoiceId(), e.getErrorClass(), e.getErrorCode());
+        }
+        return null;
+    }
+
+    private void handleForObject(final Address from, final BACnetObject bo, final boolean throwOnBadType)
+            throws BACnetServiceException {
+        if (bo instanceof LifeSafety) {
+            ((LifeSafety) bo).handleLifeSafetyOperation(from, requestingProcessIdentifier, requestingSource, request);
+        } else if (throwOnBadType) {
+            throw new BACnetServiceException(ErrorClass.object, ErrorCode.unsupportedObjectType);
+        }
     }
 
     @Override

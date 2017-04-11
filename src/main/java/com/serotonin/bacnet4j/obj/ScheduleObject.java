@@ -28,7 +28,6 @@
  */
 package com.serotonin.bacnet4j.obj;
 
-import java.time.Clock;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.Objects;
@@ -47,7 +46,6 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetRuntimeException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.mixin.HasStatusFlagsMixin;
-import com.serotonin.bacnet4j.obj.mixin.PropertyListMixin;
 import com.serotonin.bacnet4j.obj.mixin.event.IntrinsicReportingMixin;
 import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.NoneAlgo;
 import com.serotonin.bacnet4j.service.acknowledgement.AcknowledgementService;
@@ -66,6 +64,7 @@ import com.serotonin.bacnet4j.type.constructed.SpecialEvent;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.constructed.TimeValue;
 import com.serotonin.bacnet4j.type.constructed.ValueSource;
+import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
 import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
@@ -79,11 +78,25 @@ import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Primitive;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
-public class ScheduleObject<T extends Primitive> extends BACnetObject {
+/**
+ * TODO
+ * - use reliability to convey schedule problems.
+ *
+ * @author Matthew
+ */
+public class ScheduleObject extends BACnetObject {
     static final Logger LOG = LoggerFactory.getLogger(ScheduleObject.class);
 
+    // CreateObject constructor
+    public static ScheduleObject create(final LocalDevice localDevice, final int instanceNumber)
+            throws BACnetServiceException {
+        return new ScheduleObject(localDevice, instanceNumber, ObjectType.schedule.toString() + " " + instanceNumber,
+                new DateRange(Date.UNSPECIFIED, Date.UNSPECIFIED),
+                new BACnetArray<>(7, new DailySchedule(new SequenceOf<>())), new SequenceOf<>(), BinaryPV.inactive,
+                new SequenceOf<>(), 12, false);
+    }
+
     private ScheduledFuture<?> presentValueRefersher;
-    private final Clock clock;
 
     /**
      * A proprietary mechanism to periodically write the present value to all property references in case of power
@@ -93,11 +106,10 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
 
     public ScheduleObject(final LocalDevice localDevice, final int instanceNumber, final String name,
             final DateRange effectivePeriod, final BACnetArray<DailySchedule> weeklySchedule,
-            final SequenceOf<SpecialEvent> exceptionSchedule, final T scheduleDefault,
+            final SequenceOf<SpecialEvent> exceptionSchedule, final Primitive scheduleDefault,
             final SequenceOf<DeviceObjectPropertyReference> listOfObjectPropertyReferences,
-            final int priorityForWriting, final boolean outOfService, final Clock clock) throws BACnetServiceException {
+            final int priorityForWriting, final boolean outOfService) throws BACnetServiceException {
         super(localDevice, ObjectType.schedule, instanceNumber, name);
-        this.clock = clock;
 
         if (effectivePeriod == null)
             throw new BACnetRuntimeException("effectivePeriod cannot be null");
@@ -109,37 +121,32 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
             throw new BACnetRuntimeException("listOfObjectPropertyReferences cannot be null");
 
         writePropertyInternal(PropertyIdentifier.effectivePeriod, effectivePeriod);
+        writePropertyInternal(PropertyIdentifier.scheduleDefault, scheduleDefault);
         if (weeklySchedule != null) {
             if (weeklySchedule.getCount() != 7)
                 throw new BACnetRuntimeException("weeklySchedule must have 7 elements");
-            writePropertyInternal(PropertyIdentifier.weeklySchedule, weeklySchedule);
+            writeProperty(null, new PropertyValue(PropertyIdentifier.weeklySchedule, weeklySchedule));
         }
         if (exceptionSchedule != null)
-            writePropertyInternal(PropertyIdentifier.exceptionSchedule, exceptionSchedule);
-        writePropertyInternal(PropertyIdentifier.scheduleDefault, scheduleDefault);
+            writeProperty(null, new PropertyValue(PropertyIdentifier.exceptionSchedule, exceptionSchedule));
         writePropertyInternal(PropertyIdentifier.presentValue, scheduleDefault);
-        writePropertyInternal(PropertyIdentifier.listOfObjectPropertyReferences, listOfObjectPropertyReferences);
+        writeProperty(null,
+                new PropertyValue(PropertyIdentifier.listOfObjectPropertyReferences, listOfObjectPropertyReferences));
         writePropertyInternal(PropertyIdentifier.priorityForWriting, new UnsignedInteger(priorityForWriting));
         writePropertyInternal(PropertyIdentifier.reliability, Reliability.noFaultDetected);
-        writePropertyInternal(PropertyIdentifier.outOfService, new Boolean(outOfService));
+        writePropertyInternal(PropertyIdentifier.outOfService, Boolean.valueOf(outOfService));
         writePropertyInternal(PropertyIdentifier.statusFlags, new StatusFlags(false, false, false, outOfService));
 
         addMixin(new HasStatusFlagsMixin(this));
         addMixin(new ScheduleMixin(this));
-        addMixin(new PropertyListMixin(this));
 
-        final T oldValue = get(PropertyIdentifier.presentValue);
+        final Primitive oldValue = get(PropertyIdentifier.presentValue);
         updatePresentValue();
-        final T newValue = get(PropertyIdentifier.presentValue);
+        final Primitive newValue = get(PropertyIdentifier.presentValue);
         // If the present value didn't change after the update, then no write would have been done. So, to ensure
         // initialization of the objects in the list, force a write.
         if (Objects.equals(oldValue, newValue))
             doWrites(newValue);
-
-        // Validations
-        // 1) entries in the list of property references must reference properties of this type
-        // 2) time value entries in the weekly and exception schedules must be of this type
-        // 3) time values must have times that are fully specific.
     }
 
     public void supportIntrinsicReporting(final int notificationClass, final EventTransitionBits eventEnable,
@@ -150,10 +157,58 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.eventEnable, eventEnable);
         writePropertyInternal(PropertyIdentifier.eventState, EventState.normal);
         writePropertyInternal(PropertyIdentifier.notifyType, notifyType);
-        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, new Boolean(true));
+        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, Boolean.TRUE);
 
         // Now add the mixin.
-        addMixin(new IntrinsicReportingMixin(this, new NoneAlgo(), null, new PropertyIdentifier[0]));
+        addMixin(new IntrinsicReportingMixin(this, new NoneAlgo(), null, null, new PropertyIdentifier[0]));
+    }
+
+    @Override
+    protected boolean validateProperty(final ValueSource valueSource, final PropertyValue value)
+            throws BACnetServiceException {
+        if (PropertyIdentifier.listOfObjectPropertyReferences.equals(value.getPropertyIdentifier())) {
+            // Entries must reference properties of this type
+            final Primitive scheduleDefault = get(PropertyIdentifier.scheduleDefault);
+            final SequenceOf<DeviceObjectPropertyReference> refs = value.getValue();
+            for (final DeviceObjectPropertyReference ref : refs) {
+                final ObjectPropertyTypeDefinition def = ObjectProperties.getObjectPropertyTypeDefinition(
+                        ref.getObjectIdentifier().getObjectType(), ref.getPropertyIdentifier());
+                if (def != null) {
+                    if (scheduleDefault.getClass() != def.getPropertyTypeDefinition().getClazz()) {
+                        throw new BACnetServiceException(ErrorClass.property, ErrorCode.invalidDataType);
+                    }
+                }
+            }
+        } else if (PropertyIdentifier.weeklySchedule.equals(value.getPropertyIdentifier())) {
+            // Time value entries must be of this type
+            final Primitive scheduleDefault = get(PropertyIdentifier.scheduleDefault);
+            final BACnetArray<DailySchedule> weeklySchedule = value.getValue();
+            for (final DailySchedule daily : weeklySchedule) {
+                for (final TimeValue timeValue : daily.getDaySchedule()) {
+                    if (scheduleDefault.getClass() != timeValue.getValue().getClass()) {
+                        throw new BACnetServiceException(ErrorClass.property, ErrorCode.invalidDataType);
+                    }
+                    if (!timeValue.getTime().isFullySpecified()) {
+                        throw new BACnetServiceException(ErrorClass.property, ErrorCode.invalidConfigurationData);
+                    }
+                }
+            }
+        } else if (PropertyIdentifier.exceptionSchedule.equals(value.getPropertyIdentifier())) {
+            // Time value entries must be of this type
+            final Primitive scheduleDefault = get(PropertyIdentifier.scheduleDefault);
+            final SequenceOf<SpecialEvent> exceptionSchedule = value.getValue();
+            for (final SpecialEvent specialEvent : exceptionSchedule) {
+                for (final TimeValue timeValue : specialEvent.getListOfTimeValues()) {
+                    if (scheduleDefault.getClass() != timeValue.getValue().getClass()) {
+                        throw new BACnetServiceException(ErrorClass.property, ErrorCode.invalidDataType);
+                    }
+                    if (!timeValue.getTime().isFullySpecified()) {
+                        throw new BACnetServiceException(ErrorClass.property, ErrorCode.invalidConfigurationData);
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -181,7 +236,7 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
     }
 
     @Override
-    public void terminate() {
+    protected void terminateImpl() {
         cancelRefresher();
         cancelPeriodicWriter();
     }
@@ -236,18 +291,17 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
 
     synchronized void updatePresentValue() {
         final GregorianCalendar gc = new GregorianCalendar();
-        gc.setTimeInMillis(clock.millis());
+        gc.setTimeInMillis(getLocalDevice().getClock().millis());
         updatePresentValue(new DateTime(gc));
     }
 
-    @SuppressWarnings("unchecked")
     private void updatePresentValue(final DateTime now) {
         cancelRefresher();
 
-        T newValue;
+        Primitive newValue;
         long nextCheck;
 
-        final T scheduleDefault = get(PropertyIdentifier.scheduleDefault);
+        final Primitive scheduleDefault = get(PropertyIdentifier.scheduleDefault);
         final DateRange effectivePeriod = get(PropertyIdentifier.effectivePeriod);
         if (!effectivePeriod.matches(now.getDate())) {
             // Not in the current effective date.
@@ -274,7 +328,7 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
                 TimeValue currentTv = null;
                 int tvIndex = schedule.getCount();
                 for (; tvIndex > 0; tvIndex--) {
-                    final TimeValue tv = schedule.get(tvIndex);
+                    final TimeValue tv = schedule.getBase1(tvIndex);
 
                     if (!tv.getTime().after(now.getTime())) {
                         // Found a time value entry that can be used.
@@ -287,11 +341,11 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
                 if (currentTv == null)
                     newValue = scheduleDefault;
                 else
-                    newValue = (T) currentTv.getValue();
+                    newValue = currentTv.getValue();
 
                 // Determine the next time this method should run.
                 if (tvIndex < schedule.getCount()) {
-                    final TimeValue nextTv = schedule.get(tvIndex + 1);
+                    final TimeValue nextTv = schedule.getBase1(tvIndex + 1);
                     nextCheck = timeOf(now.getDate(), nextTv);
                 } else
                     nextCheck = nextDay(now);
@@ -333,8 +387,13 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
                 final CalendarObject co = (CalendarObject) getLocalDevice().getObject(e.getCalendarReference());
                 if (co != null) {
                     // Getting the property this way ensures that the calendar's present value gets is calculated.
-                    final Boolean pv = co.getProperty(PropertyIdentifier.presentValue);
-                    active = pv.booleanValue();
+                    try {
+                        final Boolean pv = co.readProperty(PropertyIdentifier.presentValue);
+                        active = pv.booleanValue();
+                    } catch (final BACnetServiceException ex) {
+                        LOG.warn("Error while retrieving calendar's present value", ex);
+                        active = false;
+                    }
                 } else
                     active = false;
             } else
@@ -357,7 +416,7 @@ public class ScheduleObject<T extends Primitive> extends BACnetObject {
         if (!dow.isSpecific())
             dow = DayOfWeek.forDate(now.getDate());
 
-        return weeklySchedule.get(dow.getId());
+        return weeklySchedule.getBase1(dow.getId());
     }
 
     void doWrites(final Encodable value) {

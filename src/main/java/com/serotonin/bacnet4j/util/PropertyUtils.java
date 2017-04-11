@@ -237,8 +237,7 @@ public class PropertyUtils {
 
         final AtomicInteger remaining = new AtomicInteger(refs.size());
         try {
-            ReadListener deviceCallback = null;
-            deviceCallback = new ReadListener() {
+            final ReadListener deviceCallback = new ReadListener() {
                 @Override
                 public boolean progress(final double deviceProgress, final int did, final ObjectIdentifier oid,
                         final PropertyIdentifier pid, final UnsignedInteger pin, final Encodable value) {
@@ -269,6 +268,7 @@ public class PropertyUtils {
             LOG.error("Exception while getting properties for device {}", rd.getInstanceNumber(), ex);
         }
     }
+
     //
     //    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //    ////////////////////////////////////////////////////////////////////////////////////////////////////////////

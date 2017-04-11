@@ -821,7 +821,7 @@ public class ObjectProperties {
         add(ObjectType.binaryLightingOutput, PropertyIdentifier.blinkWarnEnable, Boolean.class, true);
         add(ObjectType.binaryLightingOutput, PropertyIdentifier.egressTime, UnsignedInteger.class, true);
         add(ObjectType.binaryLightingOutput, PropertyIdentifier.egressActive, Boolean.class, true);
-        add(ObjectType.binaryLightingOutput, PropertyIdentifier.feedbackValue, Real.class, false);
+        add(ObjectType.binaryLightingOutput, PropertyIdentifier.feedbackValue, BinaryLightingPV.class, false);
         add(ObjectType.binaryLightingOutput, PropertyIdentifier.priorityArray, PriorityArray.class, true);
         add(ObjectType.binaryLightingOutput, PropertyIdentifier.relinquishDefault, Real.class, true);
         add(ObjectType.binaryLightingOutput, PropertyIdentifier.power, Real.class, false);

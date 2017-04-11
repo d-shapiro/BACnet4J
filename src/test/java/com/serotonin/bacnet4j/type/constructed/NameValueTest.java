@@ -37,7 +37,7 @@ public class NameValueTest {
     @Test
     public void sequence() {
         final SequenceOf<NameValue> seq = new SequenceOf<>( //
-                new NameValue("t1", new CharacterString("")), //
+                new NameValue("t1", CharacterString.EMPTY), //
                 new NameValue("t2"), //
                 new NameValue("t3", new CharacterString("v1")), //
                 new NameValue("t4", DateTime.UNSPECIFIED), //

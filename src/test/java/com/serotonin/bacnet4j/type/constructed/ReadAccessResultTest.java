@@ -20,13 +20,13 @@ public class ReadAccessResultTest {
         assertEquals(ObjectType.device, rar.getObjectIdentifier().getObjectType());
         assertEquals(2, rar.getObjectIdentifier().getInstanceNumber());
         assertEquals(1, rar.getListOfResults().getCount());
-        assertEquals(PropertyIdentifier.objectList, rar.getListOfResults().get(1).getPropertyIdentifier());
-        assertEquals(null, rar.getListOfResults().get(1).getPropertyArrayIndex());
-        assertEquals(true, rar.getListOfResults().get(1).getReadResult().isa(SequenceOf.class));
+        assertEquals(PropertyIdentifier.objectList, rar.getListOfResults().getBase1(1).getPropertyIdentifier());
+        assertEquals(null, rar.getListOfResults().getBase1(1).getPropertyArrayIndex());
+        assertEquals(true, rar.getListOfResults().getBase1(1).getReadResult().isa(SequenceOf.class));
 
-        final SequenceOf<ObjectIdentifier> oids = rar.getListOfResults().get(1).getReadResult().getDatum();
+        final SequenceOf<ObjectIdentifier> oids = rar.getListOfResults().getBase1(1).getReadResult().getDatum();
         assertEquals(2, oids.getCount());
-        assertEquals(new ObjectIdentifier(ObjectType.device, 2), oids.get(1));
-        assertEquals(new ObjectIdentifier(ObjectType.analogValue, 0), oids.get(2));
+        assertEquals(new ObjectIdentifier(ObjectType.device, 2), oids.getBase1(1));
+        assertEquals(new ObjectIdentifier(ObjectType.analogValue, 0), oids.getBase1(2));
     }
 }

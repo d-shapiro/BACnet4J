@@ -28,19 +28,31 @@
  */
 package com.serotonin.bacnet4j.obj;
 
+import java.util.Objects;
+
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
+import com.serotonin.bacnet4j.obj.mixin.ActiveTimeMixin;
 import com.serotonin.bacnet4j.obj.mixin.CommandableMixin;
 import com.serotonin.bacnet4j.obj.mixin.HasStatusFlagsMixin;
-import com.serotonin.bacnet4j.obj.mixin.PropertyListMixin;
+import com.serotonin.bacnet4j.obj.mixin.ReadOnlyPropertyMixin;
+import com.serotonin.bacnet4j.obj.mixin.StateChangeMixin;
+import com.serotonin.bacnet4j.obj.mixin.WritablePropertyOutOfServiceMixin;
+import com.serotonin.bacnet4j.obj.mixin.event.IntrinsicReportingMixin;
+import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.CommandFailureAlgo;
+import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
+import com.serotonin.bacnet4j.type.constructed.OptionalBinaryPV;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.enumerated.BinaryPV;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
+import com.serotonin.bacnet4j.type.enumerated.NotifyType;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.Polarity;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.enumerated.Reliability;
 import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
+import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 public class BinaryOutputObject extends BACnetObject {
     public BinaryOutputObject(final LocalDevice localDevice, final int instanceNumber, final String name,
@@ -48,51 +60,85 @@ public class BinaryOutputObject extends BACnetObject {
             final BinaryPV relinquishDefault) throws BACnetServiceException {
         super(localDevice, ObjectType.binaryOutput, instanceNumber, name);
 
+        Objects.requireNonNull(presentValue);
+        Objects.requireNonNull(polarity);
+        Objects.requireNonNull(relinquishDefault);
+
         writePropertyInternal(PropertyIdentifier.eventState, EventState.normal);
-        writePropertyInternal(PropertyIdentifier.outOfService, new Boolean(outOfService));
+        writePropertyInternal(PropertyIdentifier.outOfService, Boolean.valueOf(outOfService));
         writePropertyInternal(PropertyIdentifier.statusFlags, new StatusFlags(false, false, false, outOfService));
 
         // Mixins
         addMixin(new HasStatusFlagsMixin(this));
         addMixin(new CommandableMixin(this, PropertyIdentifier.presentValue));
-        addMixin(new PropertyListMixin(this));
+        addMixin(new WritablePropertyOutOfServiceMixin(this, PropertyIdentifier.reliability));
+        addMixin(
+                new ReadOnlyPropertyMixin(this, PropertyIdentifier.ackedTransitions, PropertyIdentifier.eventTimeStamps,
+                        PropertyIdentifier.eventMessageTexts, PropertyIdentifier.interfaceValue));
 
         _supportCommandable(relinquishDefault);
         _supportValueSource();
 
         writePropertyInternal(PropertyIdentifier.presentValue, presentValue);
         writePropertyInternal(PropertyIdentifier.polarity, polarity);
+        writePropertyInternal(PropertyIdentifier.reliability, Reliability.noFaultDetected);
+        writePropertyInternal(PropertyIdentifier.interfaceValue, new OptionalBinaryPV());
 
-        // TODO intrinsic reporting: COMMAND_FAILURE
-        //        Event_State BACnetEventState R
-        //        Time_Delay Unsigned O4,6
-        //        Notification_Class Unsigned O4,6
-        //        Feedback_Value BACnetBinaryPV O4
-        //        Event_Enable BACnetEventTransitionBits O4,6
-        //        Acked_Transitions BACnetEventTransitionBits O4,6
-        //        Notify_Type BACnetNotifyType O4,6
-        //        Event_Time_Stamps BACnetARRAY[3] of BACnetTimeStamp O4,6
-        //        Event_Message_Texts BACnetARRAY[3] of CharacterString O6
-        //        Event_Message_Texts_Config BACnetARRAY[3] of CharacterString O6
-        //        Event_Detection_Enable BOOLEAN O4,6
-        //        Event_Algorithm_Inhibit_Ref BACnetObjectPropertyReference O6
-        //        Event_Algorithm_Inhibit BOOLEAN O6,7
-        //        Time_Delay_Normal Unsigned O6
-        //        Reliability_Evaluation_Inhibit BOOLEAN O8        
-
-        // ?? changeOfStateTime
-        // ?? changeOfStateCount
-        // ?? timeOfStateCountReset
-        // ?? elapsedActiveTime
-        // ?? timeOfActiveTimeReset
+        addMixin(new StateChangeMixin(this));
     }
 
-    public void addStateText(final String inactive, final String active) {
+    public BinaryOutputObject supportIntrinsicReporting(final int timeDelay, final int notificationClass,
+            final BinaryPV feedbackValue, final EventTransitionBits eventEnable, final NotifyType notifyType,
+            final int timeDelayNormal) {
+        // Prepare the object with all of the properties that intrinsic reporting will need.
+        writePropertyInternal(PropertyIdentifier.timeDelay, new UnsignedInteger(timeDelay));
+        writePropertyInternal(PropertyIdentifier.notificationClass, new UnsignedInteger(notificationClass));
+        writePropertyInternal(PropertyIdentifier.feedbackValue, feedbackValue);
+        writePropertyInternal(PropertyIdentifier.eventEnable, eventEnable);
+        writePropertyInternal(PropertyIdentifier.notifyType, notifyType);
+        writePropertyInternal(PropertyIdentifier.timeDelayNormal, new UnsignedInteger(timeDelayNormal));
+        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, Boolean.TRUE);
+
+        addMixin(new IntrinsicReportingMixin(this, new CommandFailureAlgo(), null, PropertyIdentifier.presentValue,
+                new PropertyIdentifier[] { PropertyIdentifier.presentValue, PropertyIdentifier.feedbackValue }));
+
+        return this;
+    }
+
+    public BinaryOutputObject supportStateText(final String inactive, final String active) {
         writePropertyInternal(PropertyIdentifier.inactiveText, new CharacterString(inactive));
         writePropertyInternal(PropertyIdentifier.activeText, new CharacterString(active));
+        return this;
     }
 
-    public void supportCovReporting() {
-        _supportCovReporting(null);
+    public BinaryOutputObject supportCovReporting() {
+        _supportCovReporting(null, null);
+        return this;
+    }
+
+    public BinaryOutputObject supportActiveTime(final boolean useFeedback) {
+        if (useFeedback) {
+            // Ensure that there is a feedback value.
+            if (get(PropertyIdentifier.feedbackValue) == null) {
+                throw new IllegalStateException("feedback-value not set");
+            }
+        }
+        addMixin(new ActiveTimeMixin(this, useFeedback));
+        return this;
+    }
+
+    public BinaryPV getPhysicalState() {
+        final BinaryPV presentValue = get(PropertyIdentifier.presentValue);
+
+        final Boolean outOfService = get(PropertyIdentifier.outOfService);
+        if (outOfService.booleanValue())
+            return presentValue;
+
+        final Polarity polarity = get(PropertyIdentifier.polarity);
+        if (polarity.equals(Polarity.normal))
+            return presentValue;
+        if (presentValue.equals(BinaryPV.active))
+            return BinaryPV.inactive;
+        return BinaryPV.active;
     }
 }

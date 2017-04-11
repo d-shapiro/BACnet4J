@@ -111,21 +111,14 @@ abstract public class Primitive extends Encodable {
         return getPrimitiveTypeId(firstByte) != -1;
     }
 
-    /**
-     * This field is maintained specifically for boolean types, since their encoding differs depending on whether the
-     * type is context specific or not.
-     */
-    protected boolean contextSpecific;
-
     @Override
-    final public void write(final ByteQueue queue) {
+    public void write(final ByteQueue queue) {
         writeTag(queue, getTypeId(), false, getLength());
         writeImpl(queue);
     }
 
     @Override
-    final public void write(final ByteQueue queue, final int contextId) {
-        contextSpecific = true;
+    public void write(final ByteQueue queue, final int contextId) {
         writeTag(queue, contextId, true, getLength());
         writeImpl(queue);
     }
@@ -142,7 +135,7 @@ abstract public class Primitive extends Encodable {
 
     abstract public byte getTypeId();
 
-    private static void writeTag(final ByteQueue queue, final int tagNumber, final boolean classTag,
+    protected static void writeTag(final ByteQueue queue, final int tagNumber, final boolean classTag,
             final long length) {
         final int classValue = classTag ? 8 : 0;
 
@@ -179,7 +172,7 @@ abstract public class Primitive extends Encodable {
     protected long readTag(final ByteQueue queue) {
         final byte b = queue.pop();
         int tagNumber = (b & 0xff) >> 4;
-        contextSpecific = (b & 8) != 0;
+        //        contextSpecific = (b & 8) != 0;
         long length = b & 7;
 
         if (tagNumber == 0xf)

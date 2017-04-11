@@ -32,8 +32,11 @@ import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
+import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.service.acknowledgement.AcknowledgementService;
 import com.serotonin.bacnet4j.type.constructed.Address;
+import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
+import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
@@ -55,7 +58,14 @@ public class DeleteObjectRequest extends ConfirmedRequestService {
     public AcknowledgementService handle(final LocalDevice localDevice, final Address from)
             throws BACnetErrorException {
         try {
+            final BACnetObject bo = localDevice.getObjectRequired(objectIdentifier);
+
+            if (!bo.isDeletable())
+                throw new BACnetServiceException(ErrorClass.object, ErrorCode.objectDeletionNotPermitted);
+
             localDevice.removeObject(objectIdentifier);
+
+            localDevice.incrementDatabaseRevision();
         } catch (final BACnetServiceException e) {
             throw new BACnetErrorException(getChoiceId(), e);
         }

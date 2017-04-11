@@ -37,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.transport.Transport;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 import com.serotonin.bacnet4j.util.sero.SerialPortWrapper;
 import com.serotonin.bacnet4j.util.sero.StreamUtils;
@@ -108,8 +109,8 @@ abstract public class MstpNode implements Runnable {
         return wrapper.getCommPortId();
     }
 
-    public void initialize(final Clock clock) throws Exception {
-        this.clock = clock;
+    public void initialize(final Transport transport) throws Exception {
+        this.clock = transport.getLocalDevice().getClock();
         initialize(true);
     }
 

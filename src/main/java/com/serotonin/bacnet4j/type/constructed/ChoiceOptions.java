@@ -38,17 +38,21 @@ import com.serotonin.bacnet4j.type.primitive.Primitive;
 
 public class ChoiceOptions {
     private final List<Class<? extends Primitive>> primitives = new ArrayList<>();
-    private final Map<Integer, Class<? extends Encodable>> contextual = new HashMap<>();
+    private final Map<Integer, ContextualType> contextual = new HashMap<>();
 
     public void addPrimitive(final Class<? extends Primitive> primitive) {
         primitives.add(primitive);
     }
 
     public void addContextual(final Integer contextId, final Class<? extends Encodable> clazz) {
-        contextual.put(contextId, clazz);
+        contextual.put(contextId, new ContextualType(clazz, false));
     }
 
-    public Class<? extends Encodable> getContextualClass(final int contextId) {
+    public void addContextualSequence(final Integer contextId, final Class<? extends Encodable> clazz) {
+        contextual.put(contextId, new ContextualType(clazz, true));
+    }
+
+    public ContextualType getContextualClass(final int contextId) {
         return contextual.get(contextId);
     }
 
@@ -56,11 +60,29 @@ public class ChoiceOptions {
         return primitives.contains(clazz);
     }
 
-    public int getContextId(final Class<? extends Encodable> clazz) {
-        for (final Map.Entry<Integer, Class<? extends Encodable>> e : contextual.entrySet()) {
-            if (e.getValue().equals(clazz))
+    public int getContextId(final Class<? extends Encodable> clazz, final boolean sequence) {
+        for (final Map.Entry<Integer, ContextualType> e : contextual.entrySet()) {
+            if (e.getValue().clazz.equals(clazz) && e.getValue().sequence == sequence)
                 return e.getKey();
         }
         return -1;
+    }
+
+    public static class ContextualType {
+        private final Class<? extends Encodable> clazz;
+        private final boolean sequence;
+
+        public ContextualType(final Class<? extends Encodable> clazz, final boolean sequence) {
+            this.clazz = clazz;
+            this.sequence = sequence;
+        }
+
+        public Class<? extends Encodable> getClazz() {
+            return clazz;
+        }
+
+        public boolean isSequence() {
+            return sequence;
+        }
     }
 }

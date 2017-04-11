@@ -45,6 +45,7 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetTimeoutException;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
+import com.serotonin.bacnet4j.util.sero.ThreadUtils;
 
 /**
  * A utility for finding a specific device by id. Generally this should not be used directly. It is better to use the
@@ -162,11 +163,7 @@ public class RemoteDeviceFinder {
                 if (remoteDevice != null)
                     return remoteDevice;
 
-                try {
-                    wait(timeoutMillis);
-                } catch (final InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                ThreadUtils.wait(this, timeoutMillis);
 
                 if (cancelled)
                     throw new CancellationException();

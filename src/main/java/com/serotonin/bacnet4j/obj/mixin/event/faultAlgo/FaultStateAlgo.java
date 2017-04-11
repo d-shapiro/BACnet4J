@@ -28,6 +28,8 @@
  */
 package com.serotonin.bacnet4j.obj.mixin.event.faultAlgo;
 
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +37,12 @@ import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.FaultParameter.AbstractFaultParameter;
 import com.serotonin.bacnet4j.type.constructed.FaultParameter.FaultState;
+import com.serotonin.bacnet4j.type.constructed.ObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.PropertyStates;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.enumerated.Reliability;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 
 // 13.4.5
 public class FaultStateAlgo extends FaultAlgorithm {
@@ -69,7 +73,8 @@ public class FaultStateAlgo extends FaultAlgorithm {
 
     @Override
     public Reliability evaluateAlgorithmic(final Encodable oldMonitoredValue, final Encodable newMonitoredValue,
-            final Reliability currentReliability, final AbstractFaultParameter parameters) {
+            final Reliability currentReliability, final ObjectIdentifier monitoredObjectReference,
+            final Map<ObjectPropertyReference, Encodable> additionalValues, final AbstractFaultParameter parameters) {
         final FaultState p = (FaultState) parameters;
         return evaluate( //
                 oldMonitoredValue, //

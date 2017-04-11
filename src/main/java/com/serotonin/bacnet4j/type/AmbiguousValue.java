@@ -28,6 +28,8 @@
  */
 package com.serotonin.bacnet4j.type;
 
+import java.util.Arrays;
+
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.Primitive;
@@ -35,7 +37,28 @@ import com.serotonin.bacnet4j.util.sero.ByteQueue;
 import com.serotonin.bacnet4j.util.sero.StreamUtils;
 
 public class AmbiguousValue extends Encodable {
+    @SuppressWarnings("unchecked")
+    public static <T extends Encodable> T convertTo(final Encodable value, final Class<T> clazz)
+            throws BACnetException {
+        if (value instanceof AmbiguousValue) {
+            return ((AmbiguousValue) value).convertTo(clazz);
+        }
+        return (T) value;
+    }
+
     private byte[] data;
+
+    public AmbiguousValue(final byte[] data) {
+        this.data = data;
+    }
+
+    public AmbiguousValue(final Encodable... sequence) {
+        final ByteQueue queue = new ByteQueue();
+        for (final Encodable e : sequence) {
+            e.write(queue);
+        }
+        data = queue.popAll();
+    }
 
     public AmbiguousValue(final ByteQueue queue) {
         final TagData tagData = new TagData();
@@ -55,10 +78,6 @@ public class AmbiguousValue extends Encodable {
         }
 
         popEnd(queue, contextId);
-    }
-
-    public AmbiguousValue(final byte[] data) {
-        this.data = data;
     }
 
     @Override
@@ -112,14 +131,17 @@ public class AmbiguousValue extends Encodable {
 
     @Override
     public String toString() {
+        String s;
         if (Primitive.isPrimitive(data[0])) {
             try {
-                return convertTo(Primitive.class).toString();
+                s = convertTo(Primitive.class).toString();
             } catch (final BACnetException e) {
                 throw new RuntimeException(e);
             }
+        } else {
+            s = StreamUtils.dumpArrayHex(data);
         }
-        return "Ambiguous(" + StreamUtils.dumpArrayHex(data) + ")";
+        return "Ambiguous(" + s + ")";
     }
 
     private static void copyData(final ByteQueue queue, final int length, final ByteQueue data) {
@@ -150,10 +172,14 @@ public class AmbiguousValue extends Encodable {
             return true;
         if (obj == null)
             return false;
+        if (obj instanceof AmbiguousValue) {
+            final AmbiguousValue that = (AmbiguousValue) obj;
+            return Arrays.equals(data, that.data);
+        }
+
         if (!(obj instanceof Encodable))
             return false;
         final Encodable eobj = (Encodable) obj;
-
         try {
             return convertTo(eobj.getClass()).equals(obj);
         } catch (@SuppressWarnings("unused") final BACnetException e) {

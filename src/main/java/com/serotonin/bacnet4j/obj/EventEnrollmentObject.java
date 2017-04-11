@@ -1,6 +1,8 @@
 package com.serotonin.bacnet4j.obj;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ScheduledFuture;
@@ -14,7 +16,6 @@ import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.mixin.HasStatusFlagsMixin;
-import com.serotonin.bacnet4j.obj.mixin.PropertyListMixin;
 import com.serotonin.bacnet4j.obj.mixin.ReadOnlyPropertyMixin;
 import com.serotonin.bacnet4j.obj.mixin.event.AlgoReportingMixin;
 import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.EventAlgorithm;
@@ -24,6 +25,7 @@ import com.serotonin.bacnet4j.type.constructed.DeviceObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
 import com.serotonin.bacnet4j.type.constructed.FaultParameter;
 import com.serotonin.bacnet4j.type.constructed.FaultParameter.AbstractFaultParameter;
+import com.serotonin.bacnet4j.type.constructed.ObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.PropertyReference;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
@@ -37,6 +39,7 @@ import com.serotonin.bacnet4j.type.eventParameter.AbstractEventParameter;
 import com.serotonin.bacnet4j.type.eventParameter.EventParameter;
 import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.Null;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.bacnet4j.util.PropertyValues;
@@ -48,6 +51,8 @@ public class EventEnrollmentObject extends BACnetObject {
     private final AlgoReportingMixin algoReporting;
     private final ScheduledFuture<?> pollingFuture;
     private final PropertyIdentifier[] monitoredProperties;
+    private final DeviceObjectPropertyReference eventParameterReference;
+    private final List<DeviceObjectPropertyReference> faultParameterReferences;
     private final PropertyReferences monitoredPropertyReferences;
     private boolean configurationError;
 
@@ -64,6 +69,19 @@ public class EventEnrollmentObject extends BACnetObject {
             throw new IllegalArgumentException("PropertyIdentifier cannot be special identifier: "
                     + objectPropertyReference.getPropertyIdentifier());
         }
+        final AbstractEventParameter aep = eventParameter.getChoice().getDatum();
+        eventParameterReference = aep.getReference();
+        if (eventParameterReference != null) {
+            // Ensure that any reference made in the event parameters is to the same device
+            // as the object property reference.
+            // TODO allow different devices.
+            if (!eventParameterReference.getDeviceIdentifier().equals(objectPropertyReference.getDeviceIdentifier())) {
+                throw new IllegalArgumentException(
+                        "Event parameter reference must use the same device as the object property reference: parameter="
+                                + eventParameterReference.getDeviceIdentifier() + ", property="
+                                + objectPropertyReference.getPropertyIdentifier());
+            }
+        }
 
         writePropertyInternal(PropertyIdentifier.eventType, eventParameter.getEventType());
         writePropertyInternal(PropertyIdentifier.notifyType, notifyType);
@@ -74,7 +92,7 @@ public class EventEnrollmentObject extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.eventEnable, eventEnable);
         writePropertyInternal(PropertyIdentifier.notificationClass, new UnsignedInteger(notificationClass));
         writePropertyInternal(PropertyIdentifier.reliability, Reliability.noFaultDetected);
-        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, new Boolean(true));
+        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, Boolean.TRUE);
         if (timeDelayNormal != null)
             writePropertyInternal(PropertyIdentifier.timeDelayNormal, timeDelayNormal);
         if (faultParameter != null) {
@@ -88,10 +106,8 @@ public class EventEnrollmentObject extends BACnetObject {
         // Mixins
         addMixin(new HasStatusFlagsMixin(this));
         addMixin(new ReadOnlyPropertyMixin(this, PropertyIdentifier.eventType));
-        addMixin(new PropertyListMixin(this));
 
         // Event parameters and algo
-        final AbstractEventParameter aep = (AbstractEventParameter) eventParameter.getChoice().getDatum();
         final EventAlgorithm eventAlgo = aep.createEventAlgorithm();
         Objects.requireNonNull(eventAlgo, "No algorithm defined for event parameter type " + eventParameter.getClass());
 
@@ -103,30 +119,76 @@ public class EventEnrollmentObject extends BACnetObject {
             faultAlgo = afp.createFaultAlgorithm();
             Objects.requireNonNull(faultAlgo,
                     "No algorithm defined for fault parameter type " + faultParameter.getClass());
+
+            if (afp.getReferences() != null) {
+                faultParameterReferences = afp.getReferences();
+                for (final DeviceObjectPropertyReference faultRef : faultParameterReferences) {
+                    // Ensure that any reference made in the fault parameters is to the same device
+                    // as the object property reference.
+                    // TODO allow different devices.
+                    if (!faultRef.getDeviceIdentifier().equals(objectPropertyReference.getDeviceIdentifier())) {
+                        throw new IllegalArgumentException(
+                                "Fault parameter reference must use the same device as the object property reference: parameter="
+                                        + faultRef.getDeviceIdentifier() + ", property="
+                                        + objectPropertyReference.getPropertyIdentifier());
+                    }
+                }
+            } else {
+                faultParameterReferences = new ArrayList<>();
+            }
+
+            // Table 13-5: add change of reliability notification parameters
+            faultParameterReferences.add(new DeviceObjectPropertyReference( //
+                    objectPropertyReference.getDeviceIdentifier().getInstanceNumber(), //
+                    objectPropertyReference.getObjectIdentifier(), //
+                    PropertyIdentifier.reliability));
+            faultParameterReferences.add(new DeviceObjectPropertyReference( //
+                    objectPropertyReference.getDeviceIdentifier().getInstanceNumber(), //
+                    objectPropertyReference.getObjectIdentifier(), //
+                    PropertyIdentifier.statusFlags));
+        } else {
+            faultParameterReferences = null;
         }
 
         // Algo reporting mixin
         algoReporting = new AlgoReportingMixin(this, eventAlgo, aep, faultAlgo, afp, objectPropertyReference);
         addMixin(algoReporting);
 
+        //
         // Create the list of monitored values.
-        monitoredProperties = eventAlgo.getAdditionalMonitoredProperties();
         monitoredPropertyReferences = new PropertyReferences();
+
         // Add the referenced value.
         monitoredPropertyReferences.addIndex(objectPropertyReference.getObjectIdentifier(),
                 objectPropertyReference.getPropertyIdentifier(), objectPropertyReference.getPropertyArrayIndex());
+
         // Add the additional monitored properties (Table 12-15.1)
+        monitoredProperties = eventAlgo.getAdditionalMonitoredProperties();
         for (final PropertyIdentifier pid : monitoredProperties)
             monitoredPropertyReferences.add(objectPropertyReference.getObjectIdentifier(), pid);
 
+        // Add the event parameter reference, if any.
+        if (eventParameterReference != null) {
+            monitoredPropertyReferences.addIndex(eventParameterReference.getObjectIdentifier(),
+                    eventParameterReference.getPropertyIdentifier(), eventParameterReference.getPropertyArrayIndex());
+        }
+
+        // Add the fault parameters references, if any.
+        if (faultParameterReferences != null) {
+            for (final DeviceObjectPropertyReference faultRef : faultParameterReferences) {
+                monitoredPropertyReferences.addIndex(faultRef.getObjectIdentifier(), faultRef.getPropertyIdentifier(),
+                        faultRef.getPropertyArrayIndex());
+            }
+        }
+
+        //
         // Start polling
         pollingFuture = localDevice.scheduleWithFixedDelay(() -> doPoll(), pollDelayMillis, pollDelayMillis,
                 TimeUnit.MILLISECONDS);
     }
 
     @Override
-    public void terminate() {
-        super.terminate();
+    protected void terminateImpl() {
         pollingFuture.cancel(false);
     }
 
@@ -157,10 +219,11 @@ public class EventEnrollmentObject extends BACnetObject {
     }
 
     private void doPollThrow() throws PollException {
+        // TODO consider using a polling delegate
         final DeviceObjectPropertyReference ref = get(PropertyIdentifier.objectPropertyReference);
 
         Encodable value;
-        final Map<PropertyIdentifier, Encodable> additionalValues = new HashMap<>();
+        final Map<ObjectPropertyReference, Encodable> additionalValues = new HashMap<>();
 
         if (ref.getDeviceIdentifier().equals(getLocalDevice().getId())) {
             // A local object
@@ -170,13 +233,24 @@ public class EventEnrollmentObject extends BACnetObject {
             }
 
             try {
-                value = bo.getProperty(ref.getPropertyIdentifier(), ref.getPropertyArrayIndex());
+                value = bo.readProperty(ref.getPropertyIdentifier(), ref.getPropertyArrayIndex());
                 for (final PropertyIdentifier pid : monitoredProperties) {
-                    additionalValues.put(pid, bo.getProperty(pid));
+                    additionalValues.put(new ObjectPropertyReference(bo.getId(), pid), bo.readProperty(pid));
                 }
             } catch (final BACnetServiceException e) {
                 throw new PollException("Error getting property from local object at " + ref, e);
             }
+
+            if (eventParameterReference != null) {
+                addParameterReference(getLocalDevice(), eventParameterReference, additionalValues);
+            }
+
+            if (faultParameterReferences != null) {
+                for (final DeviceObjectPropertyReference faultRef : faultParameterReferences) {
+                    addParameterReference(getLocalDevice(), faultRef, additionalValues);
+                }
+            }
+
         } else {
             // A remote object
             final RemoteDevice rd;
@@ -195,11 +269,21 @@ public class EventEnrollmentObject extends BACnetObject {
 
                 // Gather the additional properties
                 for (final PropertyIdentifier pid : monitoredProperties) {
-                    final Encodable e = results.getNoErrorCheck(ref.getObjectIdentifier(), pid);
-                    if (e instanceof ErrorClassAndCode) {
-                        throw new PollException("Error returned from reading " + pid + " for " + ref + ": " + e);
+                    transferPropertyValue(results, additionalValues, ref.getObjectIdentifier(), pid, null);
+                }
+
+                // Get the event parameter
+                if (eventParameterReference != null) {
+                    transferPropertyValue(results, additionalValues, eventParameterReference.getObjectIdentifier(),
+                            eventParameterReference.getPropertyIdentifier(),
+                            eventParameterReference.getPropertyArrayIndex());
+                }
+
+                if (faultParameterReferences != null) {
+                    for (final DeviceObjectPropertyReference faultRef : faultParameterReferences) {
+                        transferPropertyValue(results, additionalValues, faultRef.getObjectIdentifier(),
+                                faultRef.getPropertyIdentifier(), faultRef.getPropertyArrayIndex());
                     }
-                    additionalValues.put(pid, e);
                 }
             } catch (final BACnetException e) {
                 throw new PollException("Error getting property from remote device at " + ref, e);
@@ -221,5 +305,34 @@ public class EventEnrollmentObject extends BACnetObject {
         }
 
         algoReporting.updateValue(value, additionalValues);
+    }
+
+    private static void addParameterReference(final LocalDevice localDevice,
+            final DeviceObjectPropertyReference paramRef,
+            final Map<ObjectPropertyReference, Encodable> additionalValues) throws PollException {
+        final BACnetObject bo = localDevice.getObject(paramRef.getObjectIdentifier());
+        if (bo == null) {
+            throw new PollException("EventEnrollment could not find local object at " + paramRef.getObjectIdentifier());
+        }
+
+        try {
+            additionalValues.put(
+                    new ObjectPropertyReference(bo.getId(), paramRef.getPropertyIdentifier(),
+                            paramRef.getPropertyArrayIndex()),
+                    bo.readProperty(paramRef.getPropertyIdentifier(), paramRef.getPropertyArrayIndex()));
+        } catch (final BACnetServiceException e) {
+            throw new PollException("Error getting property from local object at " + paramRef, e);
+        }
+    }
+
+    private static void transferPropertyValue(final PropertyValues results,
+            final Map<ObjectPropertyReference, Encodable> additionalValues, final ObjectIdentifier oid,
+            final PropertyIdentifier pid, final UnsignedInteger pin) throws PollException {
+        final Encodable e = results.getNoErrorCheck(oid, pid);
+        if (e instanceof ErrorClassAndCode) {
+            throw new PollException(
+                    "Error returned from reading oid=" + oid + ", pid=" + pid + ", pin=" + pin + ": " + e);
+        }
+        additionalValues.put(new ObjectPropertyReference(oid, pid, pin), e);
     }
 }

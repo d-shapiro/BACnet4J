@@ -55,7 +55,7 @@ public class HasStatusFlagsMixin extends AbstractMixin {
     }
 
     @Override
-    protected boolean writeProperty(final ValueSource valueSource, final PropertyValue value)
+    protected boolean validateProperty(final ValueSource valueSource, final PropertyValue value)
             throws BACnetServiceException {
         if (statusFlags.equals(value.getPropertyIdentifier()))
             throw new BACnetServiceException(ErrorClass.property, ErrorCode.writeAccessDenied);
@@ -79,7 +79,7 @@ public class HasStatusFlagsMixin extends AbstractMixin {
                 !EventState.normal.equals(eventState), //
                 reliability == null ? false : !Reliability.noFaultDetected.equals(reliability), //
                 overridden, //
-                outOfService.booleanValue());
+                outOfService == null ? false : outOfService.booleanValue());
         writePropertyInternal(PropertyIdentifier.statusFlags, statusFlags);
     }
 

@@ -29,10 +29,12 @@
 package com.serotonin.bacnet4j.transport;
 
 import java.time.Clock;
+import java.util.Arrays;
 
 import com.serotonin.bacnet4j.ResponseConsumer;
 import com.serotonin.bacnet4j.apdu.APDU;
 import com.serotonin.bacnet4j.apdu.Segmentable;
+import com.serotonin.bacnet4j.service.confirmed.ConfirmedRequestService;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
 public class UnackedMessageContext {
@@ -40,6 +42,9 @@ public class UnackedMessageContext {
     private int attemptsLeft;
 
     private final Clock clock;
+
+    // Temporarily add to the context for troubleshooting.
+    private final ConfirmedRequestService service;
 
     // The response consumer, for confirmed requests
     private final ResponseConsumer consumer;
@@ -58,10 +63,11 @@ public class UnackedMessageContext {
     private int lastIdSent;
 
     public UnackedMessageContext(final Clock clock, final int timeout, final int retries,
-            final ResponseConsumer consumer) {
+            final ResponseConsumer consumer, final ConfirmedRequestService service) {
         this.clock = clock;
         reset(timeout, retries);
         this.consumer = consumer;
+        this.service = service;
     }
 
     public void retry(final int timeout) {
@@ -84,6 +90,10 @@ public class UnackedMessageContext {
 
     public ResponseConsumer getConsumer() {
         return consumer;
+    }
+
+    public ConfirmedRequestService getService() {
+        return service;
     }
 
     public APDU getOriginalApdu() {
@@ -145,5 +155,14 @@ public class UnackedMessageContext {
 
     public void setLastIdSent(final int lastIdSent) {
         this.lastIdSent = lastIdSent;
+    }
+
+    @Override
+    public String toString() {
+        return "UnackedMessageContext [deadline=" + deadline + ", attemptsLeft=" + attemptsLeft + ", clock=" + clock
+                + ", service=" + service + ", consumer=" + consumer + ", originalApdu=" + originalApdu
+                + ", segmentWindow=" + segmentWindow + ", segmentedMessage=" + segmentedMessage + ", segmentTemplate="
+                + segmentTemplate + ", serviceData=" + serviceData + ", segBuf=" + Arrays.toString(segBuf)
+                + ", lastIdSent=" + lastIdSent + "]";
     }
 }

@@ -64,7 +64,7 @@ public class GetEventInformationRequest extends ConfirmedRequestService {
                 summaries.add(eventSummary);
         }
 
-        return new GetEventInformationAck(summaries, new Boolean(false));
+        return new GetEventInformationAck(summaries, Boolean.FALSE);
     }
 
     @Override

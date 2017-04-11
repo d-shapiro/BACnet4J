@@ -186,7 +186,7 @@ public class RequestUtils {
 
                     // ... then try getting it by sending requests for indices. Find out how many there are.
                     final int len = ((UnsignedInteger) sendReadPropertyAllowNull(localDevice, d, oid, pid,
-                            new UnsignedInteger(0), null)).intValue();
+                            UnsignedInteger.ZERO, null)).intValue();
 
                     // Create a list of individual property references.
                     final PropertyReferences refs = new PropertyReferences();
@@ -230,7 +230,8 @@ public class RequestUtils {
             specs.add(new ReadAccessSpecification(oid, new SequenceOf<>(refs)));
             final ReadPropertyMultipleAck ack = (ReadPropertyMultipleAck) localDevice
                     .send(d, new ReadPropertyMultipleRequest(new SequenceOf<>(specs))).get();
-            return ack.getListOfReadAccessResults().get(1).getListOfResults().get(1).getReadResult().getDatum();
+            return ack.getListOfReadAccessResults().getBase1(1).getListOfResults().getBase1(1).getReadResult()
+                    .getDatum();
         }
 
         throw new BACnetException("Device does not support readProperty nor readPropertyMultiple");
@@ -293,7 +294,6 @@ public class RequestUtils {
 
         if (forceMultiple || refs.size() > 1 && multipleSupported) {
             // Read property multiple can be used. Determine the max references
-
             final int maxRef = d.getMaxReadMultipleReferences();
 
             // If the device supports read property multiple, send them all at once, or at least in partitions.
@@ -363,12 +363,19 @@ public class RequestUtils {
                         // For the first request, rethrow the exception
                         throw e;
                     }
+
                     // Otherwise, populate the properties with errors.
                     populateWithError(d, properties, updater,
                             new ErrorClassAndCode(ErrorClass.device, ErrorCode.timeout));
                     partitions.remove(0);
                 } catch (final ErrorAPDUException e) {
-                    populateWithError(d, properties, updater, e.getError());
+                    // The error returned may only apply to a single reference. If there is more than one reference in
+                    // the partition, send the requests one at a time.
+                    if (partition.size() < 2)
+                        populateWithError(d, properties, updater, e.getError());
+                    else {
+                        sendOneAtATime(localDevice, d, partition, updater);
+                    }
                     partitions.remove(0);
                 } catch (final BACnetException e) {
                     throw new BACnetException("Completed " + counter + " requests. Excepted on: " + request, e);
@@ -377,9 +384,10 @@ public class RequestUtils {
                 if (updater.cancelled())
                     break;
             }
-        } else
+        } else {
             // If it doesn't support read property multiple, send them one at a time.
             sendOneAtATime(localDevice, d, refs, updater);
+        }
 
         return propertyValues;
     }
@@ -533,9 +541,10 @@ public class RequestUtils {
             localDevice.send(d, new WritePropertyMultipleRequest(new SequenceOf<>(specs))).get();
         } else {
             for (final WriteAccessSpecification spec : specs) {
-                for (final PropertyValue pv : spec.getListOfProperties())
+                for (final PropertyValue pv : spec.getListOfProperties()) {
                     localDevice.send(d, new WritePropertyRequest(spec.getObjectIdentifier(), pv.getPropertyIdentifier(),
                             pv.getPropertyArrayIndex(), pv.getValue(), pv.getPriority())).get();
+                }
             }
         }
     }

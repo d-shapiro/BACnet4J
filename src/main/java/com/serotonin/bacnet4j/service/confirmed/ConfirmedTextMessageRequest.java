@@ -66,7 +66,7 @@ public class ConfirmedTextMessageRequest extends ConfirmedRequestService {
     public ConfirmedTextMessageRequest(final ObjectIdentifier textMessageSourceDevice,
             final CharacterString messageClass, final MessagePriority messagePriority, final CharacterString message) {
         this.textMessageSourceDevice = textMessageSourceDevice;
-        this.messageClass = new Choice(0, messageClass, choiceOptions);
+        this.messageClass = new Choice(1, messageClass, choiceOptions);
         this.messagePriority = messagePriority;
         this.message = message;
     }

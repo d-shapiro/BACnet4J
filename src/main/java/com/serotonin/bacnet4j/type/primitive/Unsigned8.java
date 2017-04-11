@@ -31,7 +31,7 @@ package com.serotonin.bacnet4j.type.primitive;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
 public class Unsigned8 extends UnsignedInteger {
-    private static final int MAX = 0xff - 1;
+    private static final int MAX = 0xff;
 
     public Unsigned8(final int value) {
         super(value);

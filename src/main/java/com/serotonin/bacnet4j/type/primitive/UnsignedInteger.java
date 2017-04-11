@@ -33,6 +33,7 @@ import java.math.BigInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
 public class UnsignedInteger extends Primitive {
+    public static final UnsignedInteger ZERO = new UnsignedInteger(0);
     public static final byte TYPE_ID = 2;
 
     private int smallValue;
@@ -70,6 +71,28 @@ public class UnsignedInteger extends Primitive {
         if (bigValue == null)
             return BigInteger.valueOf(smallValue);
         return bigValue;
+    }
+
+    /**
+     * Returns an UnsignedInteger that is one larger than this, wrapping at 0x100000000.
+     */
+    public UnsignedInteger increment32() {
+        return increment32(1);
+    }
+
+    public UnsignedInteger increment32(final long amount) {
+        return new UnsignedInteger((longValue() + amount) % 0x100000000L);
+    }
+
+    /**
+     * Returns an UnsignedInteger that is one larger than this, wrapping at 0x10000.
+     */
+    public UnsignedInteger increment16() {
+        return increment16(1);
+    }
+
+    public UnsignedInteger increment16(final int amount) {
+        return new UnsignedInteger((intValue() + amount) % 0x10000L);
     }
 
     //

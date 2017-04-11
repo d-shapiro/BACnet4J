@@ -74,6 +74,12 @@ public class UnsignedRangeNotif extends AbstractNotificationParameter {
     }
 
     @Override
+    public String toString() {
+        return "UnsignedRangeNotif [exceedingValue=" + exceedingValue + ", statusFlags=" + statusFlags
+                + ", exceedingLimit=" + exceedingLimit + "]";
+    }
+
+    @Override
     public int hashCode() {
         final int PRIME = 31;
         int result = 1;

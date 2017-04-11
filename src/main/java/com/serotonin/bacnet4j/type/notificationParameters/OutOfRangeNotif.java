@@ -82,7 +82,7 @@ public class OutOfRangeNotif extends AbstractNotificationParameter {
 
     @Override
     public String toString() {
-        return "OutOfRange [exceedingValue=" + exceedingValue + ", statusFlags=" + statusFlags + ", deadband="
+        return "OutOfRangeNotif [exceedingValue=" + exceedingValue + ", statusFlags=" + statusFlags + ", deadband="
                 + deadband + ", exceededLimit=" + exceededLimit + "]";
     }
 

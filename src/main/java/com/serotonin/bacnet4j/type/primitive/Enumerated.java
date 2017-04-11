@@ -60,12 +60,6 @@ public class Enumerated extends Primitive {
         return bigValue.intValue();
     }
 
-    //    public long longValue() {
-    //        if (bigValue == null)
-    //            return smallValue;
-    //        return bigValue.longValue();
-    //    }
-
     public BigInteger bigIntegerValue() {
         if (bigValue == null)
             return BigInteger.valueOf(smallValue);
@@ -205,11 +199,16 @@ public class Enumerated extends Primitive {
     }
 
     @Override
+    public String toString() {
+        return "Enumerated [smallValue=" + smallValue + ", bigValue=" + bigValue + "]";
+    }
+
+    @Override
     public int hashCode() {
-        final int PRIME = 31;
+        final int prime = 31;
         int result = 1;
-        result = PRIME * result + (bigValue == null ? 0 : bigValue.hashCode());
-        result = PRIME * result + smallValue;
+        result = prime * result + (bigValue == null ? 0 : bigValue.hashCode());
+        result = prime * result + smallValue;
         return result;
     }
 
@@ -219,9 +218,38 @@ public class Enumerated extends Primitive {
             return true;
         if (obj == null)
             return false;
-        if (!Enumerated.class.isAssignableFrom(obj.getClass()))
+        if (getClass() != obj.getClass())
             return false;
         final Enumerated other = (Enumerated) obj;
-        return bigIntegerValue().equals(other.bigIntegerValue());
+        if (bigValue == null) {
+            if (other.bigValue != null)
+                return false;
+        } else if (!bigValue.equals(other.bigValue))
+            return false;
+        if (smallValue != other.smallValue)
+            return false;
+        return true;
     }
+
+    //
+    //    @Override
+    //    public int hashCode() {
+    //        final int PRIME = 31;
+    //        int result = 1;
+    //        result = PRIME * result + (bigValue == null ? 0 : bigValue.hashCode());
+    //        result = PRIME * result + smallValue;
+    //        return result;
+    //    }
+    //
+    //    @Override
+    //    public boolean equals(final Object obj) {
+    //        if (this == obj)
+    //            return true;
+    //        if (obj == null)
+    //            return false;
+    //        if (!Enumerated.class.isAssignableFrom(obj.getClass()))
+    //            return false;
+    //        final Enumerated other = (Enumerated) obj;
+    //        return bigIntegerValue().equals(other.bigIntegerValue());
+    //    }
 }

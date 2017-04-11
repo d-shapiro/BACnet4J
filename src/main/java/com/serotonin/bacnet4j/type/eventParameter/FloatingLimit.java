@@ -96,6 +96,11 @@ public class FloatingLimit extends AbstractEventParameter {
     }
 
     @Override
+    public DeviceObjectPropertyReference getReference() {
+        return setpointReference;
+    }
+
+    @Override
     public int hashCode() {
         final int PRIME = 31;
         int result = 1;

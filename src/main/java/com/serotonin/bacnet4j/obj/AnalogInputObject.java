@@ -31,13 +31,14 @@ package com.serotonin.bacnet4j.obj;
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.mixin.HasStatusFlagsMixin;
-import com.serotonin.bacnet4j.obj.mixin.PropertyListMixin;
 import com.serotonin.bacnet4j.obj.mixin.ReadOnlyPropertyMixin;
 import com.serotonin.bacnet4j.obj.mixin.WritablePropertyOutOfServiceMixin;
 import com.serotonin.bacnet4j.obj.mixin.event.IntrinsicReportingMixin;
 import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.OutOfRangeAlgo;
+import com.serotonin.bacnet4j.obj.mixin.event.faultAlgo.FaultOutOfRangeAlgo;
 import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
 import com.serotonin.bacnet4j.type.constructed.LimitEnable;
+import com.serotonin.bacnet4j.type.constructed.OptionalReal;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.enumerated.EngineeringUnits;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
@@ -57,28 +58,23 @@ public class AnalogInputObject extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.eventState, EventState.normal);
         writePropertyInternal(PropertyIdentifier.presentValue, new Real(presentValue));
         writePropertyInternal(PropertyIdentifier.units, units);
-        writePropertyInternal(PropertyIdentifier.outOfService, new Boolean(outOfService));
+        writePropertyInternal(PropertyIdentifier.outOfService, Boolean.valueOf(outOfService));
         writePropertyInternal(PropertyIdentifier.statusFlags, new StatusFlags(false, false, false, outOfService));
+        writePropertyInternal(PropertyIdentifier.interfaceValue, new OptionalReal());
 
         // Mixins
         addMixin(new HasStatusFlagsMixin(this));
-        addMixin(new WritablePropertyOutOfServiceMixin(this, PropertyIdentifier.presentValue));
-        addMixin(new ReadOnlyPropertyMixin(this, PropertyIdentifier.eventMessageTexts));
-        addMixin(new PropertyListMixin(this));
-
-        // TODO
-        // ?? deviceType
-        // ?? updateInterval
-        // ?? minPresValue
-        // ?? maxPresValue
-        // ?? resolution
-        // ?? faultHighLimit
-        // ?? faultLowLimit
+        addMixin(new WritablePropertyOutOfServiceMixin(this, PropertyIdentifier.presentValue,
+                PropertyIdentifier.reliability));
+        addMixin(new ReadOnlyPropertyMixin(this, PropertyIdentifier.eventMessageTexts, PropertyIdentifier.resolution,
+                PropertyIdentifier.ackedTransitions, PropertyIdentifier.eventTimeStamps,
+                PropertyIdentifier.interfaceValue));
     }
 
-    public void supportIntrinsicReporting(final int timeDelay, final int notificationClass, final float highLimit,
-            final float lowLimit, final float deadband, final LimitEnable limitEnable,
-            final EventTransitionBits eventEnable, final NotifyType notifyType, final int timeDelayNormal) {
+    public AnalogInputObject supportIntrinsicReporting(final int timeDelay, final int notificationClass,
+            final float highLimit, final float lowLimit, final float deadband, final float faultHighLimit,
+            final float faultLowLimit, final LimitEnable limitEnable, final EventTransitionBits eventEnable,
+            final NotifyType notifyType, final int timeDelayNormal) {
 
         // Prepare the object with all of the properties that intrinsic reporting will need.
         // User-defined properties
@@ -87,19 +83,27 @@ public class AnalogInputObject extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.highLimit, new Real(highLimit));
         writePropertyInternal(PropertyIdentifier.lowLimit, new Real(lowLimit));
         writePropertyInternal(PropertyIdentifier.deadband, new Real(deadband));
+        writePropertyInternal(PropertyIdentifier.faultHighLimit, new Real(faultHighLimit));
+        writePropertyInternal(PropertyIdentifier.faultLowLimit, new Real(faultLowLimit));
         writePropertyInternal(PropertyIdentifier.limitEnable, limitEnable);
         writePropertyInternal(PropertyIdentifier.eventEnable, eventEnable);
         writePropertyInternal(PropertyIdentifier.notifyType, notifyType);
         writePropertyInternal(PropertyIdentifier.timeDelayNormal, new UnsignedInteger(timeDelayNormal));
-        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, new Boolean(true));
+        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, Boolean.TRUE);
 
         // Now add the mixin.
-        addMixin(new IntrinsicReportingMixin(this, new OutOfRangeAlgo(), null, //
+        addMixin(new IntrinsicReportingMixin(this, new OutOfRangeAlgo(),
+                new FaultOutOfRangeAlgo(PropertyIdentifier.faultLowLimit, PropertyIdentifier.faultHighLimit,
+                        PropertyIdentifier.reliability),
+                PropertyIdentifier.presentValue, //
                 new PropertyIdentifier[] { PropertyIdentifier.presentValue, PropertyIdentifier.highLimit,
                         PropertyIdentifier.lowLimit, PropertyIdentifier.deadband, PropertyIdentifier.limitEnable }));
+
+        return this;
     }
 
-    public void supportCovReporting(final float covIncrement) {
-        _supportCovReporting(new Real(covIncrement));
+    public AnalogInputObject supportCovReporting(final float covIncrement) {
+        _supportCovReporting(new Real(covIncrement), null);
+        return this;
     }
 }

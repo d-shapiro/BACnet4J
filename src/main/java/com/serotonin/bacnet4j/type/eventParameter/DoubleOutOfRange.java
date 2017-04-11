@@ -38,9 +38,9 @@ public class DoubleOutOfRange extends AbstractEventParameter {
     public static final byte TYPE_ID = 14;
 
     private final UnsignedInteger timeDelay;
-    private final com.serotonin.bacnet4j.type.primitive.Double lowLimit;
-    private final com.serotonin.bacnet4j.type.primitive.Double highLimit;
-    private final com.serotonin.bacnet4j.type.primitive.Double deadband;
+    private final Double lowLimit;
+    private final Double highLimit;
+    private final Double deadband;
 
     public DoubleOutOfRange(final UnsignedInteger timeDelay, final Double lowLimit, final Double highLimit,
             final Double deadband) {
@@ -60,24 +60,24 @@ public class DoubleOutOfRange extends AbstractEventParameter {
 
     public DoubleOutOfRange(final ByteQueue queue) throws BACnetException {
         timeDelay = read(queue, UnsignedInteger.class, 0);
-        lowLimit = read(queue, com.serotonin.bacnet4j.type.primitive.Double.class, 1);
-        highLimit = read(queue, com.serotonin.bacnet4j.type.primitive.Double.class, 2);
-        deadband = read(queue, com.serotonin.bacnet4j.type.primitive.Double.class, 3);
+        lowLimit = read(queue, Double.class, 1);
+        highLimit = read(queue, Double.class, 2);
+        deadband = read(queue, Double.class, 3);
     }
 
     public UnsignedInteger getTimeDelay() {
         return timeDelay;
     }
 
-    public com.serotonin.bacnet4j.type.primitive.Double getLowLimit() {
+    public Double getLowLimit() {
         return lowLimit;
     }
 
-    public com.serotonin.bacnet4j.type.primitive.Double getHighLimit() {
+    public Double getHighLimit() {
         return highLimit;
     }
 
-    public com.serotonin.bacnet4j.type.primitive.Double getDeadband() {
+    public Double getDeadband() {
         return deadband;
     }
 

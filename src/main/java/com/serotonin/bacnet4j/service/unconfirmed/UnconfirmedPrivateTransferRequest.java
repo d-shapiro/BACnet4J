@@ -28,15 +28,22 @@
  */
 package com.serotonin.bacnet4j.service.unconfirmed;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.serotonin.bacnet4j.LocalDevice;
+import com.serotonin.bacnet4j.event.PrivateTransferHandler;
+import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.EncodedValue;
 import com.serotonin.bacnet4j.type.constructed.Address;
-import com.serotonin.bacnet4j.type.constructed.Sequence;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
 public class UnconfirmedPrivateTransferRequest extends UnconfirmedRequestService {
+    static final Logger LOG = LoggerFactory.getLogger(UnconfirmedPrivateTransferRequest.class);
+
     public static final byte TYPE_ID = 4;
 
     private final UnsignedInteger vendorId;
@@ -55,14 +62,10 @@ public class UnconfirmedPrivateTransferRequest extends UnconfirmedRequestService
         this.serviceParameters = serviceParameters;
     }
 
-    @Override
-    public void handle(final LocalDevice localDevice, final Address from) {
-        localDevice.getEventHandler().firePrivateTransfer(from, vendorId, serviceNumber, (Sequence) serviceParameters);
-    }
-
-    @Override
-    public byte getChoiceId() {
-        return TYPE_ID;
+    UnconfirmedPrivateTransferRequest(final ByteQueue queue) throws BACnetException {
+        vendorId = read(queue, UnsignedInteger.class, 0);
+        serviceNumber = read(queue, UnsignedInteger.class, 1);
+        serviceParameters = readEncodedValue(queue, 2);
     }
 
     @Override
@@ -72,11 +75,27 @@ public class UnconfirmedPrivateTransferRequest extends UnconfirmedRequestService
         writeOptional(queue, serviceParameters, 2);
     }
 
-    UnconfirmedPrivateTransferRequest(final ByteQueue queue) throws BACnetException {
-        vendorId = read(queue, UnsignedInteger.class, 0);
-        serviceNumber = read(queue, UnsignedInteger.class, 1);
-        serviceParameters = readVendorSpecific(queue, vendorId, serviceNumber,
-                LocalDevice.vendorServiceRequestResolutions, 2);
+    @Override
+    public void handle(final LocalDevice localDevice, final Address from) {
+        final PrivateTransferHandler handler = localDevice.getPrivateTransferHandler(vendorId, serviceNumber);
+
+        if (handler == null) {
+            // TODO might want a way to prevent multiple loggings of the same message.
+            LOG.warn("No handler found for vendorId {}, serviceNumber {}, ignoring unconfirmed private transfer",
+                    vendorId, serviceNumber);
+        } else {
+            try {
+                handler.handle(localDevice, from, vendorId, serviceNumber, (EncodedValue) serviceParameters, false);
+            } catch (final BACnetErrorException e) {
+                LOG.warn("Error while handling unconfirmed private transfer for vendorId {}, serviceNumber {}",
+                        vendorId, serviceNumber, e);
+            }
+        }
+    }
+
+    @Override
+    public byte getChoiceId() {
+        return TYPE_ID;
     }
 
     @Override

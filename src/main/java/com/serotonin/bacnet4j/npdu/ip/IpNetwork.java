@@ -517,6 +517,11 @@ public class IpNetwork extends Network implements Runnable {
     }
 
     @Override
+    public Address getLoopbackAddress() {
+        return IpNetworkUtils.toAddress("127.0.0.1", DEFAULT_PORT);
+    }
+
+    @Override
     public int hashCode() {
         final int prime = 31;
         int result = super.hashCode();

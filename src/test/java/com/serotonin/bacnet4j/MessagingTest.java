@@ -19,6 +19,7 @@ import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.exception.BACnetTimeoutException;
 import com.serotonin.bacnet4j.exception.ErrorAPDUException;
 import com.serotonin.bacnet4j.npdu.test.TestNetwork;
+import com.serotonin.bacnet4j.npdu.test.TestNetworkMap;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.service.acknowledgement.ReadPropertyAck;
 import com.serotonin.bacnet4j.service.acknowledgement.ReadPropertyMultipleAck;
@@ -58,9 +59,11 @@ import com.serotonin.bacnet4j.util.sero.ThreadUtils;
 public class MessagingTest {
     static final Logger LOG = LoggerFactory.getLogger(MessagingTest.class);
 
+    private final TestNetworkMap map = new TestNetworkMap();
+
     @Test
     public void networkTest() throws Exception {
-        final TestNetwork network1 = new TestNetwork(1, 200);
+        final TestNetwork network1 = new TestNetwork(map, 1, 200);
         final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(network1));
 
         final MutableObject<RemoteDevice> o = new MutableObject<>();
@@ -73,7 +76,7 @@ public class MessagingTest {
         d1.initialize();
 
         final Address a2 = new Address(new byte[] { 2 });
-        final TestNetwork network2 = new TestNetwork(a2, 200);
+        final TestNetwork network2 = new TestNetwork(map, a2, 200);
         final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(network2));
         d2.initialize();
 
@@ -91,12 +94,12 @@ public class MessagingTest {
     @Test
     public void readRequest() throws Exception {
         // Create the first local device.
-        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 200)));
+        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 200)));
         d1.initialize();
 
         // Create the second local device.
         final LocalDevice d2 = new LocalDevice(2,
-                new DefaultTransport(new TestNetwork(new Address(new byte[] { 2 }), 200)));
+                new DefaultTransport(new TestNetwork(map, new Address(new byte[] { 2 }), 200)));
         createAnalogValue(d2, 0);
         d2.initialize();
 
@@ -120,17 +123,17 @@ public class MessagingTest {
         final ReadPropertyMultipleAck ack = future.get();
 
         assertEquals(1, ack.getListOfReadAccessResults().getCount());
-        final ReadAccessResult readResult = ack.getListOfReadAccessResults().get(1);
+        final ReadAccessResult readResult = ack.getListOfReadAccessResults().getBase1(1);
         assertEquals(d2.getId(), readResult.getObjectIdentifier());
         assertEquals(1, readResult.getListOfResults().getCount());
-        final Result result = readResult.getListOfResults().get(1);
+        final Result result = readResult.getListOfResults().getBase1(1);
         assertEquals(PropertyIdentifier.objectList, result.getPropertyIdentifier());
         @SuppressWarnings("unchecked")
         final SequenceOf<ObjectIdentifier> idList = (SequenceOf<ObjectIdentifier>) result.getReadResult().getDatum();
         System.out.println(idList);
         assertEquals(2, idList.getCount());
-        assertEquals(d2.getId(), idList.get(1));
-        assertEquals(new ObjectIdentifier(ObjectType.analogValue, 0), idList.get(2));
+        assertEquals(d2.getId(), idList.getBase1(1));
+        assertEquals(new ObjectIdentifier(ObjectType.analogValue, 0), idList.getBase1(2));
 
         // Send the same request, but with a null consumer.
         d1.send(r2, new ReadPropertyMultipleRequest(new SequenceOf<>(specs)), null);
@@ -144,11 +147,11 @@ public class MessagingTest {
     @Test
     public void segmentedResponse() throws Exception {
         // Create the first local device.
-        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 200)));
+        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 200)));
         d1.initialize();
 
         // Create the second local device.
-        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(2, 200)));
+        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(map, 2, 200)));
         for (int i = 0; i < 1000; i++)
             createAnalogValue(d2, i);
         d2.initialize();
@@ -172,15 +175,15 @@ public class MessagingTest {
         final ReadPropertyMultipleAck ack = future.get();
 
         assertEquals(1, ack.getListOfReadAccessResults().getCount());
-        final ReadAccessResult readResult = ack.getListOfReadAccessResults().get(1);
+        final ReadAccessResult readResult = ack.getListOfReadAccessResults().getBase1(1);
         assertEquals(d2.getId(), readResult.getObjectIdentifier());
         assertEquals(1, readResult.getListOfResults().getCount());
-        final Result result = readResult.getListOfResults().get(1);
+        final Result result = readResult.getListOfResults().getBase1(1);
         assertEquals(PropertyIdentifier.objectList, result.getPropertyIdentifier());
         @SuppressWarnings("unchecked")
         final SequenceOf<ObjectIdentifier> idList = (SequenceOf<ObjectIdentifier>) result.getReadResult().getDatum();
         assertEquals(1001, idList.getCount());
-        assertEquals(d2.getId(), idList.get(1));
+        assertEquals(d2.getId(), idList.getBase1(1));
         //        Assert.assertEquals(av0, idList.get(2));
 
         // Send the same request, but with a null consumer.
@@ -195,11 +198,11 @@ public class MessagingTest {
     @Test
     public void writeRequest() throws Exception {
         // Create the first local device.
-        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 20)));
+        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 20)));
         d1.initialize();
 
         // Create the second local device.
-        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(2, 30)));
+        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(map, 2, 30)));
         final ObjectIdentifier av0 = new ObjectIdentifier(ObjectType.analogValue, 0);
         createAnalogValue(d2, 0);
         d2.initialize();
@@ -238,11 +241,11 @@ public class MessagingTest {
     @Test
     public void segmentedRequest() throws Exception {
         // Create the first local device.
-        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 20)));
+        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 20)));
         d1.initialize();
 
         // Create the second local device.
-        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(2, 25)));
+        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(map, 2, 25)));
         for (int i = 0; i < 1000; i++)
             createAnalogValue(d2, i);
         d2.initialize();
@@ -291,10 +294,10 @@ public class MessagingTest {
 
     @Test(expected = BACnetTimeoutException.class)
     public void disappearingRemoteDevice() throws Exception {
-        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 0)));
+        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 0)));
         d1.initialize();
 
-        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(2, 0)));
+        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(map, 2, 0)));
         createAnalogValue(d2, 0);
         d2.initialize();
 
@@ -310,7 +313,7 @@ public class MessagingTest {
         final ReadPropertyMultipleAck ack = d1.send(rd2, new ReadPropertyMultipleRequest(listOfReadAccessSpecs)).get();
 
         assertEquals(1, ack.getListOfReadAccessResults().getCount());
-        final ReadAccessResult readAccessResult = ack.getListOfReadAccessResults().get(1);
+        final ReadAccessResult readAccessResult = ack.getListOfReadAccessResults().getBase1(1);
         assertEquals(ObjectType.analogValue, readAccessResult.getObjectIdentifier().getObjectType());
         assertEquals(0, readAccessResult.getObjectIdentifier().getInstanceNumber());
 
@@ -330,10 +333,10 @@ public class MessagingTest {
 
     @Test
     public void readError() throws Exception {
-        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 0)));
+        final LocalDevice d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 0)));
         d1.initialize();
 
-        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(2, 0)));
+        final LocalDevice d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(map, 2, 0)));
         d2.initialize();
 
         final RemoteDevice rd2 = d1.getRemoteDeviceBlocking(2);
@@ -358,7 +361,7 @@ public class MessagingTest {
         return new BACnetObject(localDevice, ObjectType.analogValue, id) //
                 .writePropertyInternal(PropertyIdentifier.presentValue, new Real(3.14F)) //
                 .writePropertyInternal(PropertyIdentifier.units, EngineeringUnits.noUnits) //
-                .writePropertyInternal(PropertyIdentifier.outOfService, new Boolean(false)) //
+                .writePropertyInternal(PropertyIdentifier.outOfService, Boolean.FALSE) //
                 .writePropertyInternal(PropertyIdentifier.eventState, EventState.normal) //
                 .writePropertyInternal(PropertyIdentifier.statusFlags, new StatusFlags(false, false, false, false)) //
         ;

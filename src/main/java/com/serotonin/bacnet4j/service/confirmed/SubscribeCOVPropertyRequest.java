@@ -70,6 +70,16 @@ public class SubscribeCOVPropertyRequest extends ConfirmedRequestService {
         this.covIncrement = covIncrement;
     }
 
+    /**
+     * Useful for creating an unsubscribe request from a subscription request.
+     *
+     * @param originalSubscription
+     */
+    public SubscribeCOVPropertyRequest(final SubscribeCOVPropertyRequest subscription) {
+        this(subscription.subscriberProcessIdentifier, subscription.monitoredObjectIdentifier, null, null,
+                subscription.monitoredPropertyIdentifier, subscription.covIncrement);
+    }
+
     @Override
     public byte getChoiceId() {
         return TYPE_ID;
@@ -112,6 +122,30 @@ public class SubscribeCOVPropertyRequest extends ConfirmedRequestService {
         } catch (final BACnetServiceException e) {
             throw new BACnetErrorException(getChoiceId(), e);
         }
+    }
+
+    public UnsignedInteger getSubscriberProcessIdentifier() {
+        return subscriberProcessIdentifier;
+    }
+
+    public ObjectIdentifier getMonitoredObjectIdentifier() {
+        return monitoredObjectIdentifier;
+    }
+
+    public Boolean getIssueConfirmedNotifications() {
+        return issueConfirmedNotifications;
+    }
+
+    public UnsignedInteger getLifetime() {
+        return lifetime;
+    }
+
+    public PropertyReference getMonitoredPropertyIdentifier() {
+        return monitoredPropertyIdentifier;
+    }
+
+    public Real getCovIncrement() {
+        return covIncrement;
     }
 
     @Override

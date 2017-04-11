@@ -28,7 +28,6 @@
  */
 package com.serotonin.bacnet4j.service.acknowledgement;
 
-import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
@@ -63,7 +62,7 @@ public class ConfirmedPrivateTransferAck extends AcknowledgementService {
     ConfirmedPrivateTransferAck(final ByteQueue queue) throws BACnetException {
         vendorId = read(queue, UnsignedInteger.class, 0);
         serviceNumber = read(queue, UnsignedInteger.class, 1);
-        resultBlock = readVendorSpecific(queue, vendorId, serviceNumber, LocalDevice.vendorServiceResultResolutions, 2);
+        resultBlock = readEncodedValue(queue, 2);
     }
 
     public UnsignedInteger getVendorId() {

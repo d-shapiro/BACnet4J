@@ -76,8 +76,8 @@ public class ChangeOfReliabilityNotif extends AbstractNotificationParameter {
 
     @Override
     public String toString() {
-        return "ChangeOfReliability [reliability=" + reliability + ", statusFlags=" + statusFlags + ", propertyValues="
-                + propertyValues + "]";
+        return "ChangeOfReliabilityNotif [reliability=" + reliability + ", statusFlags=" + statusFlags
+                + ", propertyValues=" + propertyValues + "]";
     }
 
     @Override

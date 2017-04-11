@@ -43,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -53,9 +54,12 @@ import org.slf4j.LoggerFactory;
 import com.serotonin.bacnet4j.cache.CachePolicies;
 import com.serotonin.bacnet4j.cache.RemoteEntityCache;
 import com.serotonin.bacnet4j.enums.MaxApduLength;
+import com.serotonin.bacnet4j.event.DefaultReinitializeDeviceHandler;
 import com.serotonin.bacnet4j.event.DeviceEventAdapter;
 import com.serotonin.bacnet4j.event.DeviceEventHandler;
 import com.serotonin.bacnet4j.event.ExceptionDispatcher;
+import com.serotonin.bacnet4j.event.PrivateTransferHandler;
+import com.serotonin.bacnet4j.event.ReinitializeDeviceHandler;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.npdu.Network;
@@ -63,35 +67,29 @@ import com.serotonin.bacnet4j.npdu.NetworkIdentifier;
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.DeviceObject;
 import com.serotonin.bacnet4j.obj.mixin.CovContext;
+import com.serotonin.bacnet4j.persistence.IPersistence;
+import com.serotonin.bacnet4j.persistence.NullPersistence;
 import com.serotonin.bacnet4j.service.VendorServiceKey;
-import com.serotonin.bacnet4j.service.confirmed.ConfirmedEventNotificationRequest;
 import com.serotonin.bacnet4j.service.confirmed.ConfirmedRequestService;
 import com.serotonin.bacnet4j.service.confirmed.DeviceCommunicationControlRequest.EnableDisable;
 import com.serotonin.bacnet4j.service.unconfirmed.IAmRequest;
-import com.serotonin.bacnet4j.service.unconfirmed.UnconfirmedEventNotificationRequest;
+import com.serotonin.bacnet4j.service.unconfirmed.UnconfirmedCovNotificationRequest;
 import com.serotonin.bacnet4j.service.unconfirmed.UnconfirmedRequestService;
 import com.serotonin.bacnet4j.service.unconfirmed.WhoIsRequest;
 import com.serotonin.bacnet4j.transport.Transport;
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.SequenceDefinition;
 import com.serotonin.bacnet4j.type.constructed.Address;
-import com.serotonin.bacnet4j.type.constructed.Destination;
-import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
+import com.serotonin.bacnet4j.type.constructed.PropertyValue;
+import com.serotonin.bacnet4j.type.constructed.Recipient;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.constructed.ServicesSupported;
-import com.serotonin.bacnet4j.type.constructed.TimeStamp;
 import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
 import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
-import com.serotonin.bacnet4j.type.enumerated.EventState;
-import com.serotonin.bacnet4j.type.enumerated.EventType;
-import com.serotonin.bacnet4j.type.enumerated.NotifyType;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.enumerated.RestartReason;
 import com.serotonin.bacnet4j.type.enumerated.Segmentation;
 import com.serotonin.bacnet4j.type.error.ErrorClassAndCode;
-import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters;
-import com.serotonin.bacnet4j.type.primitive.Boolean;
-import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.RemoteDeviceDiscoverer;
@@ -105,25 +103,11 @@ import lohbihler.warp.WarpUtils;
  * Enhancements:
  * - Optional persistence of COV subscriptions
  * - default character string encoding
- * - BIBBs (B-OWS) (services to implement)
- * - AE-N-A
- * - AE-ACK-A
- * - AE-INFO-A
- * - AE-ESUM-A
- * - SCHED-A
- * - T-VMT-A
- * - T-ATR-A
- * - DM-DDB-A,B
- * - DM-DOB-A,B
- * - DM-DCC-A
- * - DM-TS-A
- * - DM-UTC-A
- * - DM-RD-A
- * - DM-BR-A
- * - NM-CE-A
+ * - persistence of recipient lists in notification forwarder object
  */
 public class LocalDevice {
     static final Logger LOG = LoggerFactory.getLogger(LocalDevice.class);
+    public static final String VERSION = "4.0.0";
 
     private final Transport transport;
 
@@ -145,7 +129,7 @@ public class LocalDevice {
     /**
      * The BACnet object that represents this as the local device.
      */
-    private BACnetObject deviceObject;
+    private DeviceObject deviceObject;
 
     /**
      * The clock used for all timing, except for Object.wait and Thread.sleep calls.
@@ -157,7 +141,7 @@ public class LocalDevice {
     /**
      * The local password of the device. Used in the ReinitializeDeviceRequest service.
      */
-    private String password = "";
+    private String password;
 
     /**
      * The list of all COV subscriptions currently active in the device.
@@ -168,20 +152,31 @@ public class LocalDevice {
     private final DeviceEventHandler eventHandler = new DeviceEventHandler();
     private final ExceptionDispatcher exceptionDispatcher = new ExceptionDispatcher();
 
+    // Confirmed private transfer handlers.
+    private final Map<VendorServiceKey, PrivateTransferHandler> privateTransferHandlers = new HashMap<>();
+
+    // Reinitialize device handler
+    private ReinitializeDeviceHandler reinitializeDeviceHandler = new DefaultReinitializeDeviceHandler();
+
     private ScheduledExecutorService timer;
 
-    public static final Map<VendorServiceKey, SequenceDefinition> vendorServiceRequestResolutions = new HashMap<>();
-    public static final Map<VendorServiceKey, SequenceDefinition> vendorServiceResultResolutions = new HashMap<>();
+    /**
+     * Useful when objects want to make COV subscriptions, in that it will provide a device-unique id.
+     */
+    private final AtomicInteger nextProcessId = new AtomicInteger(1);
+
+    // Default persistence to null.
+    private IPersistence persistence = new NullPersistence();
 
     public LocalDevice(final int deviceNumber, final Transport transport) {
         this.transport = transport;
         transport.setLocalDevice(this);
         remoteDeviceCache = new RemoteEntityCache<>(this);
 
-        afterInit(deviceNumber);
+        afterInstatiation(deviceNumber);
     }
 
-    private void afterInit(final int deviceNumber) {
+    private void afterInstatiation(final int deviceNumber) {
         try {
             // Initialize the device object.
             deviceObject = new DeviceObject(this, deviceNumber);
@@ -195,6 +190,11 @@ public class LocalDevice {
         }
     }
 
+    public LocalDevice withClock(final Clock clock) {
+        setClock(clock);
+        return this;
+    }
+
     public Clock getClock() {
         return clock;
     }
@@ -203,6 +203,10 @@ public class LocalDevice {
         if (initialized)
             throw new IllegalStateException("Clock needs to be set before LocalDevice is initialized");
         this.clock = clock;
+    }
+
+    public DeviceObject getDeviceObject() {
+        return deviceObject;
     }
 
     public Network getNetwork() {
@@ -229,8 +233,8 @@ public class LocalDevice {
         return deviceObject.getInstanceId();
     }
 
-    public <T extends Encodable> T getProperty(final PropertyIdentifier pid) {
-        return deviceObject.getProperty(pid);
+    public <T extends Encodable> T get(final PropertyIdentifier pid) {
+        return deviceObject.get(pid);
     }
 
     public LocalDevice writePropertyInternal(final PropertyIdentifier pid, final Encodable value) {
@@ -244,6 +248,28 @@ public class LocalDevice {
 
     public ExceptionDispatcher getExceptionDispatcher() {
         return exceptionDispatcher;
+    }
+
+    public int getNextProcessId() {
+        return nextProcessId.getAndIncrement();
+    }
+
+    public void addPrivateTransferHandler(final int vendorId, final int serviceNumber,
+            final PrivateTransferHandler handler) {
+        privateTransferHandlers.put(new VendorServiceKey(vendorId, serviceNumber), handler);
+    }
+
+    public PrivateTransferHandler getPrivateTransferHandler(final UnsignedInteger vendorId,
+            final UnsignedInteger serviceNumber) {
+        return privateTransferHandlers.get(new VendorServiceKey(vendorId, serviceNumber));
+    }
+
+    public ReinitializeDeviceHandler getReinitializeDeviceHandler() {
+        return reinitializeDeviceHandler;
+    }
+
+    public void setReinitializeDeviceHandler(final ReinitializeDeviceHandler reinitializeDeviceHandler) {
+        this.reinitializeDeviceHandler = reinitializeDeviceHandler;
     }
 
     /**
@@ -261,7 +287,12 @@ public class LocalDevice {
     }
 
     public synchronized LocalDevice initialize() throws Exception {
-        //        timer = new ScheduledExecutorServiceVariablePool(clock);
+        return initialize(RestartReason.unknown);
+    }
+
+    public synchronized LocalDevice initialize(final RestartReason lastRestartReason) throws Exception {
+        deviceObject.writePropertyInternal(PropertyIdentifier.lastRestartReason, lastRestartReason);
+
         timer = new WarpScheduledExecutorService(clock);
         transport.initialize();
         initialized = true;
@@ -305,6 +336,32 @@ public class LocalDevice {
 
             if (remaining == 0)
                 throw new Exception("Could not find an available device id after " + attempts + " attempts");
+        }
+
+        //
+        // Send restart notifications.
+
+        // The defaulting of the list of receipients is done here because sometimes the network has to be initialized
+        // before the local broadcast address is known.
+        SequenceOf<Recipient> restartNotificationRecipients = getPersistence().loadSequenceOf(
+                deviceObject.getPersistenceKey(PropertyIdentifier.restartNotificationRecipients), Recipient.class);
+        if (restartNotificationRecipients == null) {
+            restartNotificationRecipients = new SequenceOf<>(new Recipient(getLocalBroadcastAddress()));
+            deviceObject.writePropertyInternal(PropertyIdentifier.restartNotificationRecipients,
+                    restartNotificationRecipients);
+        }
+        final UnconfirmedCovNotificationRequest restartNotif = new UnconfirmedCovNotificationRequest(
+                UnsignedInteger.ZERO, getId(), getId(), UnsignedInteger.ZERO,
+                new SequenceOf<>(
+                        new PropertyValue(PropertyIdentifier.systemStatus,
+                                deviceObject.get(PropertyIdentifier.systemStatus)),
+                        new PropertyValue(PropertyIdentifier.timeOfDeviceRestart,
+                                deviceObject.get(PropertyIdentifier.timeOfDeviceRestart)),
+                        new PropertyValue(PropertyIdentifier.lastRestartReason,
+                                deviceObject.get(PropertyIdentifier.lastRestartReason))));
+        for (final Recipient recipient : restartNotificationRecipients) {
+            final Address address = recipient.toAddress(this);
+            send(address, restartNotif);
         }
 
         return this;
@@ -379,11 +436,27 @@ public class LocalDevice {
         return password;
     }
 
-    public void setPassword(final String password) {
-        if (password == null)
-            this.password = "";
-        else
-            this.password = password;
+    public LocalDevice withPassword(final String password) {
+        this.password = password;
+        return this;
+    }
+
+    public LocalDevice withAPDUSegmentTimeout(final UnsignedInteger apduSegmentTimeout) {
+        deviceObject.writePropertyInternal(PropertyIdentifier.apduSegmentTimeout, apduSegmentTimeout);
+        transport.setSegTimeout(apduSegmentTimeout.intValue());
+        return this;
+    }
+
+    public LocalDevice withAPDUTimeout(final UnsignedInteger apduTimeout) {
+        deviceObject.writePropertyInternal(PropertyIdentifier.apduTimeout, apduTimeout);
+        transport.setTimeout(apduTimeout.intValue());
+        return this;
+    }
+
+    public LocalDevice withNumberOfApduRetries(final UnsignedInteger numberOfApduRetries) {
+        deviceObject.writePropertyInternal(PropertyIdentifier.numberOfApduRetries, numberOfApduRetries);
+        transport.setTimeout(numberOfApduRetries.intValue());
+        return this;
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -419,11 +492,6 @@ public class LocalDevice {
     }
 
     public BACnetObject getObject(final String name) {
-        // TODO validate that this is not necessary.
-        //        // Check if we need to look into the local device.
-        //        if (name.equals(getObjectName()))
-        //            return this;
-
         for (final BACnetObject obj : localObjects) {
             if (name.equals(obj.getObjectName()))
                 return obj;
@@ -475,7 +543,7 @@ public class LocalDevice {
         return i;
     }
 
-    public void removeObject(final ObjectIdentifier id) throws BACnetServiceException {
+    public BACnetObject removeObject(final ObjectIdentifier id) throws BACnetServiceException {
         final BACnetObject obj = getObject(id);
         if (obj != null) {
             localObjects.remove(obj);
@@ -484,10 +552,12 @@ public class LocalDevice {
             obj.terminate();
         } else
             throw new BACnetServiceException(ErrorClass.object, ErrorCode.unknownObject);
+
+        return obj;
     }
 
     public ServicesSupported getServicesSupported() {
-        return (ServicesSupported) deviceObject.getProperty(PropertyIdentifier.protocolServicesSupported);
+        return deviceObject.get(PropertyIdentifier.protocolServicesSupported);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -534,7 +604,7 @@ public class LocalDevice {
         Objects.requireNonNull(callback);
 
         // Check for a cached instance.
-        final RemoteDevice rd = remoteDeviceCache.getCachedEntity(instanceNumber);
+        final RemoteDevice rd = getCachedRemoteDevice(instanceNumber);
 
         if (rd != null) {
             LOG.debug("Found a cached device: {}", instanceNumber);
@@ -574,7 +644,7 @@ public class LocalDevice {
 
             {
                 // Check for a cached instance
-                final RemoteDevice rd = remoteDeviceCache.getCachedEntity(instanceNumber);
+                final RemoteDevice rd = getCachedRemoteDevice(instanceNumber);
 
                 if (rd != null) {
                     LOG.debug("Found a cached device: {}", instanceNumber);
@@ -645,7 +715,7 @@ public class LocalDevice {
     public RemoteDevice getRemoteDeviceBlocking(final int instanceNumber, final long timeoutMillis)
             throws BACnetException {
         // Check for a cached instance
-        RemoteDevice rd = remoteDeviceCache.getCachedEntity(instanceNumber);
+        RemoteDevice rd = getCachedRemoteDevice(instanceNumber);
 
         if (rd == null) {
             RemoteDeviceFuture future;
@@ -727,7 +797,7 @@ public class LocalDevice {
     public void updateRemoteDevice(final int instanceNumber, final Address address) {
         if (address == null)
             throw new NullPointerException("addr cannot be null");
-        final RemoteDevice d = remoteDeviceCache.getCachedEntity(instanceNumber);
+        final RemoteDevice d = getCachedRemoteDevice(instanceNumber);
         if (d != null) {
             d.setAddress(address);
         }
@@ -738,6 +808,10 @@ public class LocalDevice {
      */
     public void clearRemoteDevices() {
         remoteDeviceCache.clear();
+    }
+
+    public List<RemoteDevice> getRemoteDevices() {
+        return remoteDeviceCache.getEntities();
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -838,29 +912,24 @@ public class LocalDevice {
             // Just use some hopeful defaults.
             transport.send(address, MaxApduLength.UP_TO_50.getMaxLengthInt(), Segmentation.noSegmentation,
                     serviceRequest, consumer);
-        }
-        send(d, serviceRequest, consumer);
+        } else
+            send(d, serviceRequest, consumer);
     }
 
     public void send(final RemoteDevice d, final UnconfirmedRequestService serviceRequest) {
-        transport.send(d.getAddress(), serviceRequest, false);
+        transport.send(d.getAddress(), serviceRequest);
     }
 
     public void send(final Address address, final UnconfirmedRequestService serviceRequest) {
-        transport.send(address, serviceRequest, false);
+        transport.send(address, serviceRequest);
     }
 
     public void sendLocalBroadcast(final UnconfirmedRequestService serviceRequest) {
-        final Address bcast = transport.getLocalBroadcastAddress();
-        transport.send(bcast, serviceRequest, true);
+        transport.send(getLocalBroadcastAddress(), serviceRequest);
     }
 
     public void sendGlobalBroadcast(final UnconfirmedRequestService serviceRequest) {
-        transport.send(Address.GLOBAL, serviceRequest, true);
-    }
-
-    public void sendBroadcast(final Address address, final UnconfirmedRequestService serviceRequest) {
-        transport.send(address, serviceRequest, true);
+        transport.send(Address.GLOBAL, serviceRequest);
     }
 
     // Doesn't work because the service choice id is not the same as the index in services supported.
@@ -871,100 +940,6 @@ public class LocalDevice {
     //                throw new BACnetRuntimeException("Remote device does not support service " + service.getClass());
     //        }
     //    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Intrinsic events
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    @SuppressWarnings("unchecked")
-    public List<BACnetException> sendIntrinsicEvent(final ObjectIdentifier eventObjectIdentifier,
-            final TimeStamp timeStamp, final int notificationClassId, final EventType eventType,
-            final CharacterString messageText, final NotifyType notifyType, final EventState fromState,
-            final EventState toState, final NotificationParameters eventValues) throws BACnetException {
-
-        // Try to find a notification class with the given id in the local objects.
-        BACnetObject nc = null;
-        for (final BACnetObject obj : localObjects) {
-            if (ObjectType.notificationClass.equals(obj.getId().getObjectType())) {
-                final UnsignedInteger ncId = (UnsignedInteger) obj.getProperty(PropertyIdentifier.notificationClass);
-                if (ncId != null && ncId.intValue() == notificationClassId) {
-                    nc = obj;
-                    break;
-                }
-            }
-        }
-
-        if (nc == null)
-            throw new BACnetException("Notification class object not found for given id: " + notificationClassId);
-
-        // Get the required properties from the notification class object.
-        SequenceOf<Destination> recipientList = null;
-        Boolean ackRequired = null;
-        UnsignedInteger priority = null;
-        try {
-            recipientList = (SequenceOf<Destination>) nc.getPropertyRequired(PropertyIdentifier.recipientList);
-            ackRequired = new Boolean(
-                    ((EventTransitionBits) nc.getPropertyRequired(PropertyIdentifier.ackRequired)).contains(toState));
-
-            // Determine which priority value to use based upon the toState.
-            final SequenceOf<UnsignedInteger> priorities = (SequenceOf<UnsignedInteger>) nc
-                    .getPropertyRequired(PropertyIdentifier.priority);
-            if (toState.equals(EventState.normal))
-                priority = priorities.get(3);
-            else if (toState.equals(EventState.fault))
-                priority = priorities.get(2);
-            else
-                // everything else is offnormal
-                priority = priorities.get(1);
-        } catch (final BACnetServiceException e) {
-            // Should never happen, so wrap in a RTE
-            throw new RuntimeException(e);
-        }
-
-        // Send the message to the destinations that are interested in it, while recording any exceptions in the result
-        // list
-        final List<BACnetException> sendExceptions = new ArrayList<>();
-        for (final Destination destination : recipientList) {
-            if (destination.isSuitableForEvent(timeStamp, toState)) {
-                if (destination.getIssueConfirmedNotifications().booleanValue()) {
-                    final ConfirmedEventNotificationRequest req = new ConfirmedEventNotificationRequest(
-                            destination.getProcessIdentifier(), getId(), eventObjectIdentifier, timeStamp,
-                            new UnsignedInteger(notificationClassId), priority, eventType, messageText, notifyType,
-                            ackRequired, fromState, toState, eventValues);
-
-                    if (destination.getRecipient().isAddress()) {
-                        send(destination.getRecipient().getAddress(), req);
-                    } else {
-                        final RemoteDevice remoteDevice = getRemoteDevice(
-                                destination.getRecipient().getDevice().getInstanceNumber()).get();
-                        send(remoteDevice, req);
-                    }
-                } else {
-                    Address address = null;
-                    if (destination.getRecipient().isAddress())
-                        address = destination.getRecipient().getAddress();
-                    else {
-                        final RemoteDevice remoteDevice = getRemoteDevice(
-                                destination.getRecipient().getDevice().getInstanceNumber()).get();
-                        if (remoteDevice != null)
-                            address = remoteDevice.getAddress();
-                    }
-
-                    if (address != null) {
-                        final UnconfirmedEventNotificationRequest req = new UnconfirmedEventNotificationRequest(
-                                destination.getProcessIdentifier(), getId(), eventObjectIdentifier, timeStamp,
-                                new UnsignedInteger(notificationClassId), priority, eventType, messageText, notifyType,
-                                ackRequired, fromState, toState, eventValues);
-                        transport.send(address, req, false);
-                    }
-                }
-            }
-        }
-
-        return sendExceptions;
-    }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1006,6 +981,24 @@ public class LocalDevice {
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Persistence
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    public IPersistence getPersistence() {
+        return persistence;
+    }
+
+    public void setPersistence(final IPersistence persistence) {
+        if (persistence == null) {
+            this.persistence = new NullPersistence();
+        } else {
+            this.persistence = persistence;
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Convenience methods
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1014,15 +1007,29 @@ public class LocalDevice {
         return transport.getNetwork().getAllLocalAddresses();
     }
 
+    public Address getLoopbackAddress() {
+        return transport.getNetwork().getLoopbackAddress();
+    }
+
     public IAmRequest getIAm() {
-        return new IAmRequest(getId(),
-                (UnsignedInteger) deviceObject.getProperty(PropertyIdentifier.maxApduLengthAccepted),
-                (Segmentation) deviceObject.getProperty(PropertyIdentifier.segmentationSupported),
-                (UnsignedInteger) deviceObject.getProperty(PropertyIdentifier.vendorIdentifier));
+        return new IAmRequest(getId(), deviceObject.get(PropertyIdentifier.maxApduLengthAccepted),
+                deviceObject.get(PropertyIdentifier.segmentationSupported),
+                deviceObject.get(PropertyIdentifier.vendorIdentifier));
     }
 
     @Override
     public String toString() {
         return "" + deviceObject.getInstanceId() + ": " + deviceObject.getObjectName();
+    }
+
+    public void incrementDatabaseRevision() {
+        UnsignedInteger databaseRevision = deviceObject.get(PropertyIdentifier.databaseRevision);
+        databaseRevision = databaseRevision.increment32();
+        deviceObject.writePropertyInternal(PropertyIdentifier.databaseRevision, databaseRevision);
+        persistence.saveEncodable("databaseRevision", databaseRevision);
+    }
+
+    public Address getLocalBroadcastAddress() {
+        return transport.getLocalBroadcastAddress();
     }
 }

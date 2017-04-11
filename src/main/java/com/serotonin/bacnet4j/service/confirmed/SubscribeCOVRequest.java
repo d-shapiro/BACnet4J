@@ -61,6 +61,10 @@ public class SubscribeCOVRequest extends ConfirmedRequestService {
         this.lifetime = lifetime;
     }
 
+    public SubscribeCOVRequest(final SubscribeCOVRequest subscription) {
+        this(subscription.subscriberProcessIdentifier, subscription.monitoredObjectIdentifier, null, null);
+    }
+
     @Override
     public byte getChoiceId() {
         return TYPE_ID;
@@ -95,6 +99,22 @@ public class SubscribeCOVRequest extends ConfirmedRequestService {
         } catch (final BACnetServiceException e) {
             throw new BACnetErrorException(getChoiceId(), e);
         }
+    }
+
+    public UnsignedInteger getSubscriberProcessIdentifier() {
+        return subscriberProcessIdentifier;
+    }
+
+    public ObjectIdentifier getMonitoredObjectIdentifier() {
+        return monitoredObjectIdentifier;
+    }
+
+    public Boolean getIssueConfirmedNotifications() {
+        return issueConfirmedNotifications;
+    }
+
+    public UnsignedInteger getLifetime() {
+        return lifetime;
     }
 
     @Override

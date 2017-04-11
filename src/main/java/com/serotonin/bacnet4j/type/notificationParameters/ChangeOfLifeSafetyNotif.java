@@ -54,8 +54,8 @@ public class ChangeOfLifeSafetyNotif extends AbstractNotificationParameter {
     @Override
     public void write(final ByteQueue queue) {
         write(queue, newState, 0);
-        write(queue, statusFlags, 1);
-        write(queue, newMode, 2);
+        write(queue, newMode, 1);
+        write(queue, statusFlags, 2);
         write(queue, operationExpected, 3);
     }
 
@@ -80,6 +80,12 @@ public class ChangeOfLifeSafetyNotif extends AbstractNotificationParameter {
 
     public LifeSafetyOperation getOperationExpected() {
         return operationExpected;
+    }
+
+    @Override
+    public String toString() {
+        return "ChangeOfLifeSafetyNotif [newState=" + newState + ", newMode=" + newMode + ", statusFlags=" + statusFlags
+                + ", operationExpected=" + operationExpected + "]";
     }
 
     @Override

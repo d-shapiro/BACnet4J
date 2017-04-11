@@ -36,6 +36,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.bacnet4j.transport.Transport;
+import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
+import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.SerialPortWrapper;
 
 public class MasterNode extends MstpNode {
@@ -76,6 +79,8 @@ public class MasterNode extends MstpNode {
      */
     private int tokenCount;
 
+    private int maxMaster = Constants.MAX_MASTER;
+
     private int maxInfoFrames = Constants.MAX_INFO_FRAMES;
 
     private MasterNodeState state;
@@ -111,14 +116,30 @@ public class MasterNode extends MstpNode {
         state = MasterNodeState.idle;
     }
 
+    public void setMaxMaster(final int maxMaster) {
+        if (maxMaster > Constants.MAX_MASTER)
+            throw new IllegalArgumentException("Cannot be greater than " + Constants.MAX_MASTER);
+        this.maxMaster = maxMaster;
+    }
+
     /**
      * @param maxInfoFrames
      *            the maxInfoFrames to set
      */
     public void setMaxInfoFrames(final int maxInfoFrames) {
-        if (this.maxInfoFrames < 1)
+        if (maxInfoFrames < 1)
             throw new IllegalArgumentException("Cannot be less than 1");
         this.maxInfoFrames = maxInfoFrames;
+    }
+
+    @Override
+    public void initialize(final Transport transport) throws Exception {
+        super.initialize(transport);
+
+        transport.getLocalDevice().getDeviceObject().writePropertyInternal(PropertyIdentifier.maxMaster,
+                new UnsignedInteger(maxMaster));
+        transport.getLocalDevice().getDeviceObject().writePropertyInternal(PropertyIdentifier.maxInfoFrames,
+                new UnsignedInteger(maxInfoFrames));
     }
 
     public void queueFrame(final FrameType type, final byte destination, final byte[] data) {
@@ -350,6 +371,13 @@ public class MasterNode extends MstpNode {
             if (LOG.isDebugEnabled())
                 LOG.debug(thisStation + " doneWithToken:SendAnotherFrame");
             state = MasterNodeState.useToken;
+        } else if (!soleMaster && nextStation == thisStation) {
+            // NextStationUnknown
+            //debug("doneWithToken:NextStationUnknown");
+            pollStation = adjacentStation(thisStation);
+            sendFrame(FrameType.pollForMaster, pollStation);
+            retryCount = 0;
+            state = MasterNodeState.pollForMaster;
         } else if (tokenCount < Constants.POLL - 1 && soleMaster) {
             // SoleMaster
             //debug("doneWithToken:SoleMaster");
@@ -388,9 +416,7 @@ public class MasterNode extends MstpNode {
             eventCount = 0;
             tokenCount = 1;
             state = MasterNodeState.passToken;
-        }
-        // NOTE: variation from spec here ----vvv (i.e. added the "- 1")
-        else if (tokenCount >= Constants.POLL - 1 && adjacentStation(pollStation) == nextStation && soleMaster) {
+        } else if (tokenCount >= Constants.POLL - 1 && adjacentStation(pollStation) == nextStation && soleMaster) {
             // SoleMasterRestartMaintenancePFM
             //debug("doneWithToken:SoleMasterRestartMaintenancePFM: poll=" + pollStation);
             if (LOG.isDebugEnabled())
@@ -456,7 +482,7 @@ public class MasterNode extends MstpNode {
             activity = true;
         } else if (silence >= delay && silence < delay + Constants.SLOT // Silence is in this master's slot.
                 // Silence is beyond all slots.
-                || silence > Constants.NO_TOKEN + Constants.SLOT * (Constants.MAX_MASTER + 1)) {
+                || silence > Constants.NO_TOKEN + Constants.SLOT * (maxMaster + 1)) {
             // GenerateToken
             //            debug("noToken:GenerateToken: poll=" + adjacentStation(thisStation));
             if (LOG.isDebugEnabled())
@@ -587,9 +613,9 @@ public class MasterNode extends MstpNode {
         }
     }
 
-    private static byte adjacentStation(final byte station) {
+    private byte adjacentStation(final byte station) {
         int i = station & 0xff;
-        i = (i + 1) % Constants.MAX_MASTER;
+        i = (i + 1) % (maxMaster + 1);
         return (byte) i;
     }
 }

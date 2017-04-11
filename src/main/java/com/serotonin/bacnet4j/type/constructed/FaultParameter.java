@@ -28,8 +28,12 @@
  */
 package com.serotonin.bacnet4j.type.constructed;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.obj.mixin.event.faultAlgo.FaultAlgorithm;
+import com.serotonin.bacnet4j.obj.mixin.event.faultAlgo.FaultLifeSafetyAlgo;
 import com.serotonin.bacnet4j.obj.mixin.event.faultAlgo.FaultOutOfRangeAlgo;
 import com.serotonin.bacnet4j.obj.mixin.event.faultAlgo.FaultStateAlgo;
 import com.serotonin.bacnet4j.type.Encodable;
@@ -50,6 +54,7 @@ import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.Unsigned16;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
+import com.serotonin.bacnet4j.util.sero.Utils;
 
 public class FaultParameter extends BaseType {
     private static ChoiceOptions choiceOptions = new ChoiceOptions();
@@ -211,6 +216,15 @@ public class FaultParameter extends BaseType {
 
     abstract public static class AbstractFaultParameter extends BaseType {
         abstract public FaultAlgorithm createFaultAlgorithm();
+
+        /**
+         * Override as required to return a reference property if the subclass has one.
+         *
+         * @return the property reference.
+         */
+        public List<DeviceObjectPropertyReference> getReferences() {
+            return null;
+        }
     }
 
     public static class FaultCharacterString extends AbstractFaultParameter {
@@ -315,6 +329,20 @@ public class FaultParameter extends BaseType {
         @Override
         public FaultAlgorithm createFaultAlgorithm() {
             return null;
+        }
+
+        @Override
+        public List<DeviceObjectPropertyReference> getReferences() {
+            List<DeviceObjectPropertyReference> refs = null;
+            for (final FaultExtendedParameter p : parameters) {
+                if (p.isReference()) {
+                    if (refs == null) {
+                        refs = new ArrayList<>();
+                    }
+                    refs.add(p.getValue());
+                }
+            }
+            return refs;
         }
 
         @Override
@@ -569,7 +597,12 @@ public class FaultParameter extends BaseType {
 
         @Override
         public FaultAlgorithm createFaultAlgorithm() {
-            return null;
+            return new FaultLifeSafetyAlgo();
+        }
+
+        @Override
+        public List<DeviceObjectPropertyReference> getReferences() {
+            return Utils.toList(modePropertyReference);
         }
 
         @Override
@@ -688,6 +721,11 @@ public class FaultParameter extends BaseType {
         @Override
         public FaultAlgorithm createFaultAlgorithm() {
             return null;
+        }
+
+        @Override
+        public List<DeviceObjectPropertyReference> getReferences() {
+            return Utils.toList(statusFlagsReference);
         }
 
         @Override
@@ -880,6 +918,11 @@ public class FaultParameter extends BaseType {
         @Override
         public FaultAlgorithm createFaultAlgorithm() {
             return null;
+        }
+
+        @Override
+        public List<DeviceObjectPropertyReference> getReferences() {
+            return Utils.toList(faultListReference);
         }
 
         @Override

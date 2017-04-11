@@ -29,6 +29,7 @@
 package com.serotonin.bacnet4j.type.constructed;
 
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.obj.logBuffer.ILogRecord;
 import com.serotonin.bacnet4j.service.confirmed.ConfirmedEventNotificationRequest;
 import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
@@ -36,7 +37,7 @@ import com.serotonin.bacnet4j.util.sero.ByteQueue;
 /**
  * @author Matthew Lohbihler
  */
-public class EventLogRecord extends BaseType {
+public class EventLogRecord extends BaseType implements ILogRecord {
     private static ChoiceOptions choiceOptions = new ChoiceOptions();
     static {
         choiceOptions.addContextual(0, LogStatus.class);
@@ -47,19 +48,26 @@ public class EventLogRecord extends BaseType {
     private final DateTime timestamp;
     private final Choice choice;
 
-    public EventLogRecord(final DateTime timestamp, final LogStatus datum) {
+    private long sequenceNumber;
+
+    public EventLogRecord(final DateTime timestamp, final LogStatus logStatus) {
         this.timestamp = timestamp;
-        choice = new Choice(0, datum, choiceOptions);
+        choice = new Choice(0, logStatus, choiceOptions);
     }
 
-    public EventLogRecord(final DateTime timestamp, final ConfirmedEventNotificationRequest datum) {
+    public EventLogRecord(final DateTime timestamp, final ConfirmedEventNotificationRequest notification) {
         this.timestamp = timestamp;
-        choice = new Choice(1, datum, choiceOptions);
+        choice = new Choice(1, notification, choiceOptions);
     }
 
-    public EventLogRecord(final DateTime timestamp, final Real datum) {
+    public EventLogRecord(final DateTime timestamp, final Real timeChange) {
         this.timestamp = timestamp;
-        choice = new Choice(2, datum, choiceOptions);
+        choice = new Choice(2, timeChange, choiceOptions);
+    }
+
+    public EventLogRecord(final ByteQueue queue) throws BACnetException {
+        timestamp = read(queue, DateTime.class, 0);
+        choice = new Choice(queue, choiceOptions, 1);
     }
 
     @Override
@@ -68,29 +76,46 @@ public class EventLogRecord extends BaseType {
         write(queue, choice, 1);
     }
 
+    @Override
     public DateTime getTimestamp() {
         return timestamp;
     }
 
+    public boolean isLogStatus() {
+        return choice.getContextId() == 0;
+    }
+
     public LogStatus getLogStatus() {
-        return (LogStatus) choice.getDatum();
+        return choice.getDatum();
     }
 
-    public ConfirmedEventNotificationRequest getConfirmedEventNotificationRequest() {
-        return (ConfirmedEventNotificationRequest) choice.getDatum();
+    public boolean isNotification() {
+        return choice.getContextId() == 1;
     }
 
-    public Real getReal() {
-        return (Real) choice.getDatum();
+    public ConfirmedEventNotificationRequest getNotification() {
+        return choice.getDatum();
+    }
+
+    public boolean isTimeChange() {
+        return choice.getContextId() == 2;
+    }
+
+    public Real getTimeChange() {
+        return choice.getDatum();
     }
 
     public Choice getChoice() {
         return choice;
     }
 
-    public EventLogRecord(final ByteQueue queue) throws BACnetException {
-        timestamp = read(queue, DateTime.class, 0);
-        choice = new Choice(queue, choiceOptions, 1);
+    @Override
+    public long getSequenceNumber() {
+        return sequenceNumber;
+    }
+
+    public void setSequenceNumber(final long sequenceNumber) {
+        this.sequenceNumber = sequenceNumber;
     }
 
     @Override

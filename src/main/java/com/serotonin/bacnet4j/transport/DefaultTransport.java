@@ -176,8 +176,9 @@ public class DefaultTransport implements Transport, Runnable {
     public void initialize() throws Exception {
         servicesSupported = localDevice.getServicesSupported();
 
+        running = true;
         network.initialize(this);
-        thread = new Thread(this, "BACnet4J transport");
+        thread = new Thread(this, "BACnet4J transport for device " + localDevice.getInstanceNumber());
         thread.start();
 
         // Send a WhoIsRouter message.
@@ -223,7 +224,9 @@ public class DefaultTransport implements Transport, Runnable {
     // Adding new requests and responses.
     //
     @Override
-    public void send(final Address address, final UnconfirmedRequestService service, final boolean broadcast) {
+    public void send(final Address address, final UnconfirmedRequestService service) {
+        final boolean broadcast = address.equals(getLocalBroadcastAddress()) || address.equals(Address.GLOBAL);
+
         // 16.1.2
         boolean allowSend = true;
         if (!EnableDisable.enable.equals(localDevice.getCommunicationControlState())) {
@@ -337,7 +340,7 @@ public class DefaultTransport implements Transport, Runnable {
             service.write(serviceData);
 
             final UnackedMessageContext ctx = new UnackedMessageContext(localDevice.getClock(), timeout, retries,
-                    consumer);
+                    consumer, service);
             final UnackedMessageKey key = unackedMessages.addClient(address, linkService, ctx);
 
             APDU apdu;
@@ -544,7 +547,7 @@ public class DefaultTransport implements Transport, Runnable {
                 UnackedMessageContext ctx;
                 if (confAPDU.getSequenceNumber() == 0)
                     // This is the first segment
-                    ctx = new UnackedMessageContext(localDevice.getClock(), timeout, retries, null);
+                    ctx = new UnackedMessageContext(localDevice.getClock(), timeout, retries, null, null);
                 else {
                     ctx = unackedMessages.remove(key);
                     if (ctx == null)
@@ -574,6 +577,7 @@ public class DefaultTransport implements Transport, Runnable {
 
             try {
                 ur.parseServiceData();
+                localDevice.getEventHandler().requestReceived(from, ur.getService());
                 ur.getService().handle(localDevice, from);
             } catch (@SuppressWarnings("unused") final BACnetRejectException e) {
                 // Ignore
@@ -589,16 +593,17 @@ public class DefaultTransport implements Transport, Runnable {
                     ack.isServer());
             final UnackedMessageContext ctx = unackedMessages.remove(key);
 
-            if (ctx == null)
-                LOG.warn("Received an acknowledgement from {} for an unknown request: {}", from, ack);
-            else if (ack instanceof SegmentACK)
+            if (ctx == null) {
+                // This can legitimately happen when requests are sent for which the sender did not need the response,
+                // such as COV unsubscribes.
+                LOG.debug("Received an acknowledgement from {} for an unknown request: {}", from, ack);
+            } else if (ack instanceof SegmentACK)
                 segmentedOutgoing(key, ctx, (SegmentACK) ack);
             else if (ctx.getConsumer() != null) {
                 final ResponseConsumer consumer = ctx.getConsumer();
-
-                if (ack instanceof SimpleACK)
+                if (ack instanceof SimpleACK) {
                     consumer.success(null);
-                else if (ack instanceof ComplexACK) {
+                } else if (ack instanceof ComplexACK) {
                     final ComplexACK cack = (ComplexACK) ack;
                     if (cack.isSegmentedMessage()) {
                         try {
@@ -772,6 +777,7 @@ public class DefaultTransport implements Transport, Runnable {
     private AcknowledgementService handleConfirmedRequest(final Address from, final byte invokeId,
             final ConfirmedRequestService service) throws BACnetException {
         try {
+            localDevice.getEventHandler().requestReceived(from, service);
             return service.handle(localDevice, from);
         } catch (@SuppressWarnings("unused") final NotImplementedException e) {
             LOG.warn("Unsupported confirmed request: invokeId=" + invokeId + ", from=" + from + ", request="
@@ -809,7 +815,7 @@ public class DefaultTransport implements Transport, Runnable {
 
                 // Prepare the segmenting session.
                 final UnackedMessageContext ctx = new UnackedMessageContext(localDevice.getClock(), timeout, retries,
-                        null);
+                        null, null);
                 final UnackedMessageKey key = unackedMessages.addServer(address, linkService, request.getInvokeId(),
                         ctx);
 

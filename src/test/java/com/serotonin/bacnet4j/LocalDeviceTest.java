@@ -22,6 +22,7 @@ import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.exception.BACnetTimeoutException;
 import com.serotonin.bacnet4j.npdu.test.TestNetwork;
+import com.serotonin.bacnet4j.npdu.test.TestNetworkMap;
 import com.serotonin.bacnet4j.obj.DeviceObject;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
@@ -35,15 +36,15 @@ public class LocalDeviceTest {
 
     // The clock will control the expiration of devices from the cache, but not the real time delays
     // when doing discoveries.
-    WarpClock clock;
+    private final WarpClock clock = new WarpClock();
+    private final TestNetworkMap map = new TestNetworkMap();
     LocalDevice d1;
     LocalDevice d2;
 
     @Before
     public void before() throws Exception {
-        clock = new WarpClock();
-        d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 100))).initialize();
-        d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(2, 100))).initialize();
+        d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 100))).initialize();
+        d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(map, 2, 100))).initialize();
     }
 
     @After
@@ -109,13 +110,9 @@ public class LocalDeviceTest {
     @Test
     public void undefinedDeviceId() throws Exception {
         final LocalDevice ld = new LocalDevice(ObjectIdentifier.UNINITIALIZED,
-                new DefaultTransport(new TestNetwork(3, 10)));
+                new DefaultTransport(new TestNetwork(map, 3, 10)));
         ld.setClock(clock);
-        new Thread(() -> {
-            for (int i = 0; i < 20; i++) {
-                clock.plusSeconds(10);
-            }
-        }).start();
+        new Thread(() -> clock.plus(200, TimeUnit.SECONDS, 10, TimeUnit.SECONDS, 10, 0)).start();
         ld.initialize();
 
         LOG.info("Local device initialized with device id {}", ld.getInstanceNumber());
@@ -138,7 +135,7 @@ public class LocalDeviceTest {
 
     @Test(expected = BACnetServiceException.class)
     public void createSecondDevice() throws BACnetServiceException {
-        final LocalDevice ld = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 0)));
+        final LocalDevice ld = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 0)));
         final DeviceObject o = new DeviceObject(ld, 2);
 
         // Ensure the device object was not automatically added to the local device.

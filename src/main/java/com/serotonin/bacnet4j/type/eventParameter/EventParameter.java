@@ -63,7 +63,7 @@ public class EventParameter extends BaseType {
     private final Choice choice;
 
     public EventParameter(final AbstractEventParameter parameters) {
-        choice = new Choice(choiceOptions.getContextId(parameters.getClass()), parameters, choiceOptions);
+        choice = new Choice(choiceOptions.getContextId(parameters.getClass(), false), parameters, choiceOptions);
     }
 
     @Override

@@ -28,9 +28,7 @@
  */
 package com.serotonin.bacnet4j.npdu.test;
 
-import java.util.Map;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.slf4j.Logger;
@@ -58,8 +56,7 @@ public class TestNetwork extends Network implements Runnable {
 
     public static final OctetString BROADCAST = new OctetString(new byte[0]);
 
-    private static Map<Address, TestNetwork> instances = new ConcurrentHashMap<>();
-
+    private final TestNetworkMap networkMap;
     private final Address address;
     private final int sendDelay;
     private int timeout = 6000;
@@ -75,11 +72,12 @@ public class TestNetwork extends Network implements Runnable {
     private long bytesOut;
     private long bytesIn;
 
-    public TestNetwork(final int address, final int sendDelay) {
-        this(new Address(new byte[] { (byte) address }), sendDelay);
+    public TestNetwork(final TestNetworkMap map, final int address, final int sendDelay) {
+        this(map, new Address(new byte[] { (byte) address }), sendDelay);
     }
 
-    public TestNetwork(final Address address, final int sendDelay) {
+    public TestNetwork(final TestNetworkMap map, final Address address, final int sendDelay) {
+        this.networkMap = map;
         this.address = address;
         this.sendDelay = sendDelay;
     }
@@ -118,19 +116,21 @@ public class TestNetwork extends Network implements Runnable {
     public void initialize(final Transport transport) throws Exception {
         super.initialize(transport);
 
+        running = true;
         transport.setTimeout(timeout);
         transport.setRetries(0); // no retries, there's no network here after all
         transport.setSegTimeout(segTimeout);
 
-        thread = new Thread(this, "BACnet4J test network");
+        thread = new Thread(this,
+                "BACnet4J test network for address " + (address.getMacAddress().getBytes()[0] & 0xff));
         thread.start();
 
-        instances.put(address, this);
+        networkMap.add(address, this);
     }
 
     @Override
     public void terminate() {
-        instances.remove(address);
+        networkMap.remove(address);
 
         running = false;
         ThreadUtils.notifySync(queue);
@@ -146,6 +146,11 @@ public class TestNetwork extends Network implements Runnable {
     @Override
     public Address[] getAllLocalAddresses() {
         return new Address[] { address };
+    }
+
+    @Override
+    public Address getLoopbackAddress() {
+        return address;
     }
 
     @Override
@@ -173,11 +178,11 @@ public class TestNetwork extends Network implements Runnable {
 
                 if (d.recipient.equals(getLocalBroadcastAddress()) || d.recipient.equals(Address.GLOBAL)) {
                     // A broadcast. Send to everyone.
-                    for (final TestNetwork network : instances.values())
+                    for (final TestNetwork network : networkMap)
                         receive(network, d.data);
                 } else {
                     // A directed message. Find the network to pass it to.
-                    final TestNetwork network = instances.get(d.recipient);
+                    final TestNetwork network = networkMap.get(d.recipient);
                     if (network != null)
                         receive(network, d.data);
                 }

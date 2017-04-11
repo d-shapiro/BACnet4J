@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
-import com.serotonin.bacnet4j.obj.mixin.PropertyListMixin;
 import com.serotonin.bacnet4j.obj.mixin.ReadOnlyPropertyMixin;
 import com.serotonin.bacnet4j.obj.mixin.event.AlertReportingMixin;
 import com.serotonin.bacnet4j.type.constructed.EventTransitionBits;
@@ -28,18 +27,17 @@ public class AlertEnrollmentObject extends BACnetObject {
             final int notificationClass, final NotifyType notifyType) throws BACnetServiceException {
         super(localDevice, ObjectType.alertEnrollment, instanceNumber, name);
 
-        defaultVendorId = localDevice.getProperty(PropertyIdentifier.vendorIdentifier);
+        defaultVendorId = localDevice.get(PropertyIdentifier.vendorIdentifier);
 
         writePropertyInternal(PropertyIdentifier.presentValue, localDevice.getId());
         writePropertyInternal(PropertyIdentifier.eventState, EventState.normal);
-        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, new Boolean(false));
+        writePropertyInternal(PropertyIdentifier.eventDetectionEnable, Boolean.FALSE);
         writePropertyInternal(PropertyIdentifier.notificationClass, new UnsignedInteger(notificationClass));
         writePropertyInternal(PropertyIdentifier.eventEnable, new EventTransitionBits(false, false, true));
         writePropertyInternal(PropertyIdentifier.notifyType, notifyType);
 
         // Mixins
         addMixin(new ReadOnlyPropertyMixin(this, PropertyIdentifier.presentValue));
-        addMixin(new PropertyListMixin(this));
 
         alertReporting = new AlertReportingMixin(this);
         addMixin(alertReporting);

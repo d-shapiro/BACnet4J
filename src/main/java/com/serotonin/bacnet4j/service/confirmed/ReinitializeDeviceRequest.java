@@ -31,13 +31,14 @@ package com.serotonin.bacnet4j.service.confirmed;
 import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
 import java.util.Map;
-
-import org.apache.commons.lang3.StringUtils;
+import java.util.Objects;
 
 import com.serotonin.bacnet4j.LocalDevice;
+import com.serotonin.bacnet4j.event.ReinitializeDeviceHandler;
 import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.service.acknowledgement.AcknowledgementService;
+import com.serotonin.bacnet4j.service.confirmed.DeviceCommunicationControlRequest.EnableDisable;
 import com.serotonin.bacnet4j.type.constructed.Address;
 import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
 import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
@@ -75,14 +76,33 @@ public class ReinitializeDeviceRequest extends ConfirmedRequestService {
 
     @Override
     public AcknowledgementService handle(final LocalDevice localDevice, final Address from) throws BACnetException {
-        if (!StringUtils.isBlank(localDevice.getPassword())) {
-            // Validate the password
-            if (!localDevice.getPassword().equals(password.toString())) {
-                throw new BACnetErrorException(getChoiceId(), ErrorClass.security, ErrorCode.passwordFailure);
+        final ReinitializeDeviceHandler handler = localDevice.getReinitializeDeviceHandler();
+        if (handler == null) {
+            throw new BACnetErrorException(ErrorClass.device, ErrorCode.notConfigured);
+        }
+
+        if (reinitializedStateOfDevice.isOneOf( //
+                ReinitializedStateOfDevice.startBackup, //
+                ReinitializedStateOfDevice.endBackup, //
+                ReinitializedStateOfDevice.startRestore, //
+                ReinitializedStateOfDevice.endRestore, //
+                ReinitializedStateOfDevice.abortRestore)) {
+            if (EnableDisable.disable.equals(localDevice.getCommunicationControlState())) {
+                throw new BACnetErrorException(ErrorClass.services, ErrorCode.communicationDisabled);
             }
         }
 
-        localDevice.getEventHandler().reinitializeDevice(from, reinitializedStateOfDevice);
+        // Performance of warmstart and coldstart are listed before the password check in 16.4.2, but we'll check
+        // the password here anyway.
+        String givenPassword = null;
+        if (password != null) {
+            givenPassword = password.getValue();
+        }
+        if (!Objects.equals(givenPassword, localDevice.getPassword())) {
+            throw new BACnetErrorException(getChoiceId(), ErrorClass.security, ErrorCode.passwordFailure);
+        }
+
+        handler.handle(localDevice, from, reinitializedStateOfDevice);
 
         return null;
     }

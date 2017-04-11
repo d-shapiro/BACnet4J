@@ -119,8 +119,9 @@ public class SegmentACK extends AckAPDU {
 
     @Override
     public String toString() {
-        return "SegmentACK(negativeAck=" + negativeAck + ", server=" + server + ", originalInvokeId=" + originalInvokeId
-                + ", sequenceNumber=" + sequenceNumber + ", actualWindowSize=" + actualWindowSize + ")";
+        return "SegmentACK [negativeAck=" + negativeAck + ", server=" + server + ", sequenceNumber=" + sequenceNumber
+                + ", actualWindowSize=" + actualWindowSize + ", expectsResponse=" + expectsResponse
+                + ", originalInvokeId=" + originalInvokeId + "]";
     }
 
     @Override

@@ -32,29 +32,24 @@ import static com.serotonin.bacnet4j.util.BACnetUtils.toInt;
 import static com.serotonin.bacnet4j.util.BACnetUtils.toLong;
 
 import java.lang.reflect.InvocationTargetException;
-import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
-import com.serotonin.bacnet4j.exception.BACnetRejectException;
 import com.serotonin.bacnet4j.exception.ReflectionException;
 import com.serotonin.bacnet4j.obj.ObjectProperties;
 import com.serotonin.bacnet4j.obj.ObjectPropertyTypeDefinition;
 import com.serotonin.bacnet4j.obj.PropertyTypeDefinition;
-import com.serotonin.bacnet4j.service.VendorServiceKey;
 import com.serotonin.bacnet4j.type.constructed.BACnetArray;
 import com.serotonin.bacnet4j.type.constructed.Choice;
 import com.serotonin.bacnet4j.type.constructed.ChoiceOptions;
-import com.serotonin.bacnet4j.type.constructed.Sequence;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
 import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
 import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
-import com.serotonin.bacnet4j.type.enumerated.RejectReason;
 import com.serotonin.bacnet4j.type.primitive.Null;
 import com.serotonin.bacnet4j.type.primitive.Primitive;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
@@ -276,7 +271,7 @@ abstract public class Encodable {
         try {
             return readChoice(queue, choiceOptions);
         } finally {
-            popEnd(queue, 0);
+            popEnd(queue, contextId);
         }
     }
 
@@ -291,7 +286,7 @@ abstract public class Encodable {
             final int contextId) throws BACnetException {
         if (!matchNonEndTag(queue, contextId))
             return null;
-        return readChoice(queue, choiceOptions);
+        return readChoice(queue, choiceOptions, contextId);
     }
 
     //
@@ -428,29 +423,27 @@ abstract public class Encodable {
 
     private static PropertyTypeDefinition getPropertyTypeDefinition(final ObjectType objectType,
             final PropertyIdentifier propertyIdentifier) {
-        final ObjectPropertyTypeDefinition def = ObjectProperties.getObjectPropertyTypeDefinition(objectType,
-                propertyIdentifier);
-        if (def != null) {
-            return def.getPropertyTypeDefinition();
+        if (objectType != null && propertyIdentifier != null) {
+            final ObjectPropertyTypeDefinition def = ObjectProperties.getObjectPropertyTypeDefinition(objectType,
+                    propertyIdentifier);
+            if (def != null) {
+                return def.getPropertyTypeDefinition();
+            }
         }
 
         // Check if the pid has only one type
-        return ObjectProperties.getPropertyTypeDefinition(propertyIdentifier);
+        if (propertyIdentifier != null) {
+            return ObjectProperties.getPropertyTypeDefinition(propertyIdentifier);
+        }
+
+        return null;
     }
 
     // Read vendor-specific
-    protected static Sequence readVendorSpecific(final ByteQueue queue, final UnsignedInteger vendorId,
-            final UnsignedInteger serviceNumber, final Map<VendorServiceKey, SequenceDefinition> resolutions,
-            final int contextId) throws BACnetException {
+    protected static EncodedValue readEncodedValue(final ByteQueue queue, final int contextId) throws BACnetException {
         if (readStart(queue) != contextId)
             return null;
-
-        final VendorServiceKey key = new VendorServiceKey(vendorId, serviceNumber);
-        final SequenceDefinition def = resolutions.get(key);
-        if (def == null)
-            throw new BACnetRejectException(RejectReason.unrecognizedService);
-
-        return new Sequence(def, queue, contextId);
+        return new EncodedValue(queue, contextId);
     }
 
     private static <T extends Encodable> T readWrapped(final ByteQueue queue, final Class<T> clazz, final int contextId)

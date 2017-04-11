@@ -76,13 +76,13 @@ public class MultistateMixin extends AbstractMixin {
                 final BACnetArray<CharacterString> stateText = get(PropertyIdentifier.stateText);
                 if (stateText != null) {
                     final int numStates = ((UnsignedInteger) newValue).intValue();
-                    final BACnetArray<CharacterString> newText = new BACnetArray<>(numStates, new CharacterString(""));
+                    final BACnetArray<CharacterString> newText = new BACnetArray<>(numStates, CharacterString.EMPTY);
 
                     // Copy the old state values in.
                     final int min = newText.getCount() < stateText.getCount() ? newText.getCount()
                             : stateText.getCount();
                     for (int i = 0; i < min; i++)
-                        newText.set(i + 1, stateText.get(i + 1));
+                        newText.set(i, stateText.get(i));
 
                     writePropertyInternal(PropertyIdentifier.stateText, newText);
                 }

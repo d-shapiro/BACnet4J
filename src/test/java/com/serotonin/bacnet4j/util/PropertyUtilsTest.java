@@ -10,6 +10,7 @@ import org.junit.Test;
 
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.npdu.test.TestNetwork;
+import com.serotonin.bacnet4j.npdu.test.TestNetworkMap;
 import com.serotonin.bacnet4j.obj.BinaryValueObject;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
 import com.serotonin.bacnet4j.type.constructed.SequenceOf;
@@ -26,6 +27,8 @@ import com.serotonin.bacnet4j.type.primitive.OctetString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 public class PropertyUtilsTest {
+    private final TestNetworkMap map = new TestNetworkMap();
+
     LocalDevice d1;
     LocalDevice d2;
     LocalDevice d3;
@@ -36,12 +39,12 @@ public class PropertyUtilsTest {
     @Before
     public void before() throws Exception {
         // Create the local devices
-        d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(1, 20))).initialize();
-        d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(2, 30))).initialize();
-        d3 = new LocalDevice(3, new DefaultTransport(new TestNetwork(3, 40))).initialize();
-        d4 = new LocalDevice(4, new DefaultTransport(new TestNetwork(4, 50))).initialize();
-        d5 = new LocalDevice(5, new DefaultTransport(new TestNetwork(5, 60))).initialize();
-        d6 = new LocalDevice(6, new DefaultTransport(new TestNetwork(6, 70))).initialize();
+        d1 = new LocalDevice(1, new DefaultTransport(new TestNetwork(map, 1, 20))).initialize();
+        d2 = new LocalDevice(2, new DefaultTransport(new TestNetwork(map, 2, 30))).initialize();
+        d3 = new LocalDevice(3, new DefaultTransport(new TestNetwork(map, 3, 40))).initialize();
+        d4 = new LocalDevice(4, new DefaultTransport(new TestNetwork(map, 4, 50))).initialize();
+        d5 = new LocalDevice(5, new DefaultTransport(new TestNetwork(map, 5, 60))).initialize();
+        d6 = new LocalDevice(6, new DefaultTransport(new TestNetwork(map, 6, 70))).initialize();
 
         // Set up objects
         addObjects(d2);
@@ -309,7 +312,7 @@ public class PropertyUtilsTest {
 
         // Change the network address of the device.
         d6.terminate();
-        d6 = new LocalDevice(6, new DefaultTransport(new TestNetwork(16, 70))).initialize();
+        d6 = new LocalDevice(6, new DefaultTransport(new TestNetwork(map, 16, 70))).initialize();
         d6.sendGlobalBroadcast(d6.getIAm());
 
         // Give time for the IAm to be processed.
@@ -338,7 +341,7 @@ public class PropertyUtilsTest {
 
         // Change the network address of the device.
         d6.terminate();
-        d6 = new LocalDevice(6, new DefaultTransport(new TestNetwork(16, 70))).initialize();
+        d6 = new LocalDevice(6, new DefaultTransport(new TestNetwork(map, 16, 70))).initialize();
         d6.writePropertyInternal(PropertyIdentifier.objectName, str("d6"));
 
         // Try getting a different property from the device.
@@ -387,10 +390,8 @@ public class PropertyUtilsTest {
                 .add(2, ObjectType.analogInput, 2, PropertyIdentifier.vendorName);
 
         final DevicesObjectPropertyValues expectedValues = new DevicesObjectPropertyValues() //
-                .add(2, ObjectType.device, 2, PropertyIdentifier.systemStatus, null,
-                        new ErrorClassAndCode(ErrorClass.object, ErrorCode.unknownObject)) //
-                .add(2, ObjectType.device, 2, PropertyIdentifier.maxApduLengthAccepted, null,
-                        new ErrorClassAndCode(ErrorClass.object, ErrorCode.unknownObject)) //
+                .add(2, ObjectType.device, 2, PropertyIdentifier.systemStatus, null, DeviceStatus.operational) //
+                .add(2, ObjectType.device, 2, PropertyIdentifier.maxApduLengthAccepted, null, new UnsignedInteger(1476)) //
                 .add(2, ObjectType.analogInput, 2, PropertyIdentifier.vendorName, null,
                         new ErrorClassAndCode(ErrorClass.object, ErrorCode.unknownObject));
 

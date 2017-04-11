@@ -41,7 +41,8 @@ public class CommandFailureNotif extends AbstractNotificationParameter {
     private final StatusFlags statusFlags;
     private final Encodable feedbackValue;
 
-    public CommandFailureNotif(final Encodable commandValue, final StatusFlags statusFlags, final Encodable feedbackValue) {
+    public CommandFailureNotif(final Encodable commandValue, final StatusFlags statusFlags,
+            final Encodable feedbackValue) {
         this.commandValue = commandValue;
         this.statusFlags = statusFlags;
         this.feedbackValue = feedbackValue;
@@ -70,6 +71,12 @@ public class CommandFailureNotif extends AbstractNotificationParameter {
 
     public Encodable getFeedbackValue() {
         return feedbackValue;
+    }
+
+    @Override
+    public String toString() {
+        return "CommandFailureNotif [commandValue=" + commandValue + ", statusFlags=" + statusFlags + ", feedbackValue="
+                + feedbackValue + "]";
     }
 
     @Override

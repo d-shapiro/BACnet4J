@@ -12,6 +12,7 @@ import com.serotonin.bacnet4j.obj.mixin.event.faultAlgo.FaultAlgorithm;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.DeviceObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.FaultParameter.AbstractFaultParameter;
+import com.serotonin.bacnet4j.type.constructed.ObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.PropertyValue;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.enumerated.EventType;
@@ -34,22 +35,26 @@ public class AlgoReportingMixin extends EventReportingMixin {
     private final DeviceObjectPropertyReference objectPropertyReference;
 
     private Encodable monitoredPropertyValue;
-    private Map<PropertyIdentifier, Encodable> additionalValues;
+    private Map<ObjectPropertyReference, Encodable> additionalValues;
 
     public AlgoReportingMixin(final EventEnrollmentObject ee, final EventAlgorithm eventAlgo,
             final AbstractEventParameter eventParameter, final FaultAlgorithm faultAlgo,
             final AbstractFaultParameter faultParameter, final DeviceObjectPropertyReference objectPropertyReference) {
         super(ee, eventAlgo, faultAlgo);
 
-        ee.writePropertyInternal(PropertyIdentifier.reliabilityEvaluationInhibit, new Boolean(false));
+        ee.writePropertyInternal(PropertyIdentifier.reliabilityEvaluationInhibit, Boolean.FALSE);
 
         this.eventParameter = eventParameter;
         this.faultParameter = faultParameter;
         this.objectPropertyReference = objectPropertyReference;
+
+        setPostNotificationAction((notifParams) -> {
+            eventParameter.postNotification(notifParams);
+        });
     }
 
     public synchronized void updateValue(final Encodable newValue,
-            final Map<PropertyIdentifier, Encodable> additionalValues) {
+            final Map<ObjectPropertyReference, Encodable> additionalValues) {
         final Encodable oldValue = monitoredPropertyValue;
         monitoredPropertyValue = newValue;
         this.additionalValues = additionalValues;
@@ -68,7 +73,8 @@ public class AlgoReportingMixin extends EventReportingMixin {
 
     @Override
     protected StateTransition evaluateEventState(final BACnetObject bo, final EventAlgorithm eventAlgo) {
-        return eventAlgo.evaluateAlgorithmicEventState(bo, monitoredPropertyValue, eventParameter);
+        return eventAlgo.evaluateAlgorithmicEventState(bo, monitoredPropertyValue,
+                objectPropertyReference.getObjectIdentifier(), additionalValues, eventParameter);
     }
 
     @Override
@@ -84,24 +90,28 @@ public class AlgoReportingMixin extends EventReportingMixin {
     @Override
     protected NotificationParameters getNotificationParameters(final EventState fromState, final EventState toState,
             final BACnetObject bo, final EventAlgorithm eventAlgo) {
-        return eventAlgo.getAlgorithmicNotificationParameters(fromState, toState, monitoredPropertyValue,
-                additionalValues, eventParameter);
+        return eventAlgo.getAlgorithmicNotificationParameters(bo, fromState, toState, monitoredPropertyValue,
+                objectPropertyReference.getObjectIdentifier(), additionalValues, eventParameter);
     }
 
     @Override
     protected Reliability evaluateFaultState(final Encodable oldMonitoredValue, final Encodable newMonitoredValue,
             final BACnetObject bo, final FaultAlgorithm faultAlgo) {
         return faultAlgo.evaluateAlgorithmic(oldMonitoredValue, newMonitoredValue,
-                bo.get(PropertyIdentifier.reliability), faultParameter);
+                bo.get(PropertyIdentifier.reliability), objectPropertyReference.getObjectIdentifier(), additionalValues,
+                faultParameter);
     }
 
     @Override
     protected PropertyValue getEventEnrollmentMonitoredProperty(final PropertyIdentifier pid) {
-        if (pid == null)
+        // Have to do this while the monitored property is not in the additional values.
+        if (pid.equals(objectPropertyReference.getPropertyIdentifier())) {
             return new PropertyValue(objectPropertyReference.getPropertyIdentifier(),
                     objectPropertyReference.getPropertyArrayIndex(), monitoredPropertyValue, null);
+        }
 
-        final Encodable value = additionalValues.get(pid);
+        final Encodable value = additionalValues
+                .get(new ObjectPropertyReference(objectPropertyReference.getObjectIdentifier(), pid));
         if (value == null) {
             LOG.debug("Could not find property {} in additional polled properties", pid);
             return null;

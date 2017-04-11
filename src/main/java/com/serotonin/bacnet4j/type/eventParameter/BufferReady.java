@@ -29,7 +29,10 @@
 package com.serotonin.bacnet4j.type.eventParameter;
 
 import com.serotonin.bacnet4j.exception.BACnetException;
+import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.BufferReadyAlgo;
 import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.EventAlgorithm;
+import com.serotonin.bacnet4j.type.notificationParameters.BufferReadyNotif;
+import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
@@ -39,9 +42,13 @@ public class BufferReady extends AbstractEventParameter {
     private final UnsignedInteger notificationThreshold;
     private final UnsignedInteger previousNotificationCount;
 
+    // This parameter is stateful.
+    private UnsignedInteger mutablePreviousNotificationCount;
+
     public BufferReady(final UnsignedInteger notificationThreshold, final UnsignedInteger previousNotificationCount) {
         this.notificationThreshold = notificationThreshold;
         this.previousNotificationCount = previousNotificationCount;
+        mutablePreviousNotificationCount = previousNotificationCount;
     }
 
     @Override
@@ -63,9 +70,20 @@ public class BufferReady extends AbstractEventParameter {
         return previousNotificationCount;
     }
 
+    public UnsignedInteger getMutablePreviousNotificationCount() {
+        return mutablePreviousNotificationCount;
+    }
+
+    @Override
+    public void postNotification(final NotificationParameters notifParams) {
+        // The previous notification count has to be updated following a notification.
+        final BufferReadyNotif brn = (BufferReadyNotif) notifParams.getParameter();
+        mutablePreviousNotificationCount = brn.getCurrentNotification();
+    }
+
     @Override
     public EventAlgorithm createEventAlgorithm() {
-        return null;
+        return new BufferReadyAlgo();
     }
 
     @Override

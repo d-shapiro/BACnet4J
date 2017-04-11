@@ -40,8 +40,12 @@ import com.serotonin.bacnet4j.util.sero.ByteQueue;
 public class EventNotificationSubscription extends BaseType {
     private final Recipient recipient; // 0
     private final Unsigned32 processIdentifier; // 1
-    private final Boolean issueConfirmedNotifications; // 3
-    private final UnsignedInteger timeRemaining; // 2
+    private final Boolean issueConfirmedNotifications; // 2
+    private final UnsignedInteger timeRemaining; // 3
+
+    // This field is used by the notification forwarder object to track subscriptions that are changed via the
+    // AddListElement and RemoveListElement services. It should not be used otherwise.
+    private int subscriptionId = -1;
 
     public EventNotificationSubscription(final Recipient recipient, final Unsigned32 processIdentifier,
             final Boolean issueConfirmedNotifications, final UnsignedInteger timeRemaining) {
@@ -67,6 +71,14 @@ public class EventNotificationSubscription extends BaseType {
         return timeRemaining;
     }
 
+    public int getSubscriptionId() {
+        return subscriptionId;
+    }
+
+    public void setSubscriptionId(final int subscriptionId) {
+        this.subscriptionId = subscriptionId;
+    }
+
     @Override
     public void write(final ByteQueue queue) {
         write(queue, recipient, 0);
@@ -89,14 +101,16 @@ public class EventNotificationSubscription extends BaseType {
                 + "]";
     }
 
+    /**
+     * NOTE: For the purposes of the RemoveListElement service this object does NOT use all parameters for hashcode and
+     * equals. Only the recipient and processIdentifier are used.
+     */
     @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + (issueConfirmedNotifications == null ? 0 : issueConfirmedNotifications.hashCode());
         result = prime * result + (processIdentifier == null ? 0 : processIdentifier.hashCode());
         result = prime * result + (recipient == null ? 0 : recipient.hashCode());
-        result = prime * result + (timeRemaining == null ? 0 : timeRemaining.hashCode());
         return result;
     }
 
@@ -109,11 +123,6 @@ public class EventNotificationSubscription extends BaseType {
         if (getClass() != obj.getClass())
             return false;
         final EventNotificationSubscription other = (EventNotificationSubscription) obj;
-        if (issueConfirmedNotifications == null) {
-            if (other.issueConfirmedNotifications != null)
-                return false;
-        } else if (!issueConfirmedNotifications.equals(other.issueConfirmedNotifications))
-            return false;
         if (processIdentifier == null) {
             if (other.processIdentifier != null)
                 return false;
@@ -123,11 +132,6 @@ public class EventNotificationSubscription extends BaseType {
             if (other.recipient != null)
                 return false;
         } else if (!recipient.equals(other.recipient))
-            return false;
-        if (timeRemaining == null) {
-            if (other.timeRemaining != null)
-                return false;
-        } else if (!timeRemaining.equals(other.timeRemaining))
             return false;
         return true;
     }

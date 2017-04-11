@@ -16,6 +16,7 @@ import com.serotonin.bacnet4j.apdu.APDU;
 import com.serotonin.bacnet4j.apdu.ConfirmedRequest;
 import com.serotonin.bacnet4j.apdu.SegmentACK;
 import com.serotonin.bacnet4j.apdu.Segmentable;
+import com.serotonin.bacnet4j.event.DeviceEventHandler;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.npdu.NPCI;
 import com.serotonin.bacnet4j.npdu.NPDU;
@@ -81,6 +82,7 @@ public class DefaultTransportTest {
 
         final LocalDevice localDevice = mock(LocalDevice.class);
         when(localDevice.getClock()).thenReturn(Clock.systemUTC());
+        when(localDevice.getEventHandler()).thenReturn(new DeviceEventHandler());
 
         final ServicesSupported servicesSupported = new ServicesSupported();
         servicesSupported.setAll(true);

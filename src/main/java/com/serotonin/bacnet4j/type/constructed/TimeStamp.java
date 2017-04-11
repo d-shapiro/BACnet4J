@@ -47,7 +47,7 @@ public class TimeStamp extends BaseType {
     }
 
     public static final TimeStamp UNSPECIFIED_TIME = new TimeStamp(Time.UNSPECIFIED);
-    public static final TimeStamp UNSPECIFIED_SEQUENCE = new TimeStamp(new UnsignedInteger(0));
+    public static final TimeStamp UNSPECIFIED_SEQUENCE = new TimeStamp(UnsignedInteger.ZERO);
     public static final TimeStamp UNSPECIFIED_DATETIME = new TimeStamp(DateTime.UNSPECIFIED);
 
     private final Choice choice;

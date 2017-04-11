@@ -62,18 +62,18 @@ public class PriorityArray extends SequenceOf<PriorityValue> {
     }
 
     public PriorityArray put(final int indexBase1, final Encodable value) {
-        set(indexBase1, new PriorityValue(value));
+        setBase1(indexBase1, new PriorityValue(value));
         return this;
     }
 
     @Override
-    public void set(final int indexBase1, final PriorityValue value) {
+    public void setBase1(final int indexBase1, final PriorityValue value) {
         if (indexBase1 < 1 || indexBase1 > LENGTH)
             throw new RuntimeException("Invalid priority value");
         if (value == null)
-            super.set(indexBase1, new PriorityValue(Null.instance));
+            super.setBase1(indexBase1, new PriorityValue(Null.instance));
         else
-            super.set(indexBase1, value);
+            super.setBase1(indexBase1, value);
     }
 
     @Override
@@ -103,7 +103,7 @@ public class PriorityArray extends SequenceOf<PriorityValue> {
 
         boolean first = true;
         for (int i = 1; i < LENGTH + 1; i++) {
-            final Encodable e = get(i).getValue();
+            final Encodable e = getBase1(i).getValue();
             if (!(e instanceof Null)) {
                 if (first)
                     first = false;

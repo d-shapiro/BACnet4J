@@ -38,6 +38,7 @@ import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.mixin.event.StateTransition;
 import com.serotonin.bacnet4j.type.Encodable;
 import com.serotonin.bacnet4j.type.constructed.LimitEnable;
+import com.serotonin.bacnet4j.type.constructed.ObjectPropertyReference;
 import com.serotonin.bacnet4j.type.constructed.StatusFlags;
 import com.serotonin.bacnet4j.type.enumerated.EventState;
 import com.serotonin.bacnet4j.type.enumerated.EventType;
@@ -46,6 +47,7 @@ import com.serotonin.bacnet4j.type.eventParameter.AbstractEventParameter;
 import com.serotonin.bacnet4j.type.eventParameter.OutOfRange;
 import com.serotonin.bacnet4j.type.notificationParameters.NotificationParameters;
 import com.serotonin.bacnet4j.type.notificationParameters.OutOfRangeNotif;
+import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Real;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
@@ -79,7 +81,8 @@ public class OutOfRangeAlgo extends EventAlgorithm {
 
     @Override
     public StateTransition evaluateAlgorithmicEventState(final BACnetObject bo, final Encodable monitoredValue,
-            final AbstractEventParameter parameters) {
+            final ObjectIdentifier monitoredObjectReference,
+            final Map<ObjectPropertyReference, Encodable> additionalValues, final AbstractEventParameter parameters) {
         final OutOfRange p = (OutOfRange) parameters;
         return evaluateEventState( //
                 bo.get(PropertyIdentifier.eventState), //
@@ -92,7 +95,7 @@ public class OutOfRangeAlgo extends EventAlgorithm {
                 bo.get(PropertyIdentifier.timeDelayNormal));
     }
 
-    public StateTransition evaluateEventState(final EventState currentState, final Real monitoredValue,
+    private static StateTransition evaluateEventState(final EventState currentState, final Real monitoredValue,
             final Real highLimit, final Real lowLimit, final Real deadband, final UnsignedInteger timeDelay,
             final LimitEnable limitEnable, UnsignedInteger timeDelayNormal) {
         final float monitoredValueFloat = monitoredValue.floatValue();
@@ -108,31 +111,31 @@ public class OutOfRangeAlgo extends EventAlgorithm {
 
         if (currentState.equals(EventState.normal) && limitEnable.isHighLimitEnable()
                 && monitoredValueFloat > highLimitFloat)
-            return new StateTransition(EventState.highLimit, timeDelay, null);
+            return new StateTransition(EventState.highLimit, timeDelay);
 
         if (currentState.equals(EventState.normal) && limitEnable.isLowLimitEnable()
                 && monitoredValueFloat < lowLimitFloat)
-            return new StateTransition(EventState.lowLimit, timeDelay, null);
+            return new StateTransition(EventState.lowLimit, timeDelay);
 
         if (currentState.equals(EventState.highLimit) && !limitEnable.isHighLimitEnable())
-            return new StateTransition(EventState.normal, null, null);
+            return new StateTransition(EventState.normal, null);
 
         if (currentState.equals(EventState.highLimit) && limitEnable.isLowLimitEnable()
                 && monitoredValueFloat < lowLimitFloat)
-            return new StateTransition(EventState.lowLimit, timeDelay, null);
+            return new StateTransition(EventState.lowLimit, timeDelay);
 
         if (currentState.equals(EventState.highLimit) && monitoredValueFloat < highLimitFloat - deadbandFloat)
-            return new StateTransition(EventState.normal, timeDelayNormal, null);
+            return new StateTransition(EventState.normal, timeDelayNormal);
 
         if (currentState.equals(EventState.lowLimit) && !limitEnable.isLowLimitEnable())
-            return new StateTransition(EventState.normal, null, null);
+            return new StateTransition(EventState.normal, null);
 
         if (currentState.equals(EventState.lowLimit) && limitEnable.isHighLimitEnable()
                 && monitoredValueFloat > highLimitFloat)
-            return new StateTransition(EventState.highLimit, timeDelay, null);
+            return new StateTransition(EventState.highLimit, timeDelay);
 
         if (currentState.equals(EventState.lowLimit) && monitoredValueFloat > lowLimitFloat + deadbandFloat)
-            return new StateTransition(EventState.normal, timeDelayNormal, null);
+            return new StateTransition(EventState.normal, timeDelayNormal);
 
         return null;
     }
@@ -149,21 +152,23 @@ public class OutOfRangeAlgo extends EventAlgorithm {
     }
 
     @Override
-    public NotificationParameters getAlgorithmicNotificationParameters(final EventState fromState,
-            final EventState toState, final Encodable monitoredValue,
-            final Map<PropertyIdentifier, Encodable> additionalValues, final AbstractEventParameter parameters) {
+    public NotificationParameters getAlgorithmicNotificationParameters(final BACnetObject bo,
+            final EventState fromState, final EventState toState, final Encodable monitoredValue,
+            final ObjectIdentifier monitoredObjectReference,
+            final Map<ObjectPropertyReference, Encodable> additionalValues, final AbstractEventParameter parameters) {
         final OutOfRange p = (OutOfRange) parameters;
         return getNotificationParameters(fromState, toState, //
                 p.getLowLimit(), //
                 p.getHighLimit(), //
                 (Real) monitoredValue, //
-                (StatusFlags) additionalValues.get(PropertyIdentifier.statusFlags), //
+                (StatusFlags) additionalValues
+                        .get(new ObjectPropertyReference(monitoredObjectReference, PropertyIdentifier.statusFlags)), //
                 p.getDeadband());
     }
 
-    public NotificationParameters getNotificationParameters(final EventState fromState, final EventState toState,
-            final Real lowLimit, final Real highLimit, final Real presentValue, final StatusFlags statusFlags,
-            final Real deadband) {
+    private static NotificationParameters getNotificationParameters(final EventState fromState,
+            final EventState toState, final Real lowLimit, final Real highLimit, final Real presentValue,
+            final StatusFlags statusFlags, final Real deadband) {
         Real exceededLimit;
         if (EventState.lowLimit.equals(toState) //
                 || EventState.lowLimit.equals(fromState) && EventState.normal.equals(toState))

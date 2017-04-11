@@ -76,7 +76,7 @@ public class RemoteObject implements Serializable {
             // No length support
             return null;
         if (e instanceof SequenceOf)
-            return (T) ((SequenceOf<Encodable>) e).get(pin.intValue());
+            return (T) ((SequenceOf<Encodable>) e).getBase1(pin.intValue());
         // The property is not a sequence, but a pin was specified. Just return null.
         return null;
     }
@@ -114,7 +114,7 @@ public class RemoteObject implements Serializable {
                 }
                 if (pin.intValue() > 0)
                     // No length support
-                    seq.set(pin.intValue(), value);
+                    seq.setBase1(pin.intValue(), value);
             }
         }
     }

@@ -29,13 +29,19 @@
 package com.serotonin.bacnet4j.service.confirmed;
 
 import com.serotonin.bacnet4j.LocalDevice;
+import com.serotonin.bacnet4j.event.PrivateTransferHandler;
+import com.serotonin.bacnet4j.exception.BACnetErrorException;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.service.acknowledgement.AcknowledgementService;
 import com.serotonin.bacnet4j.service.acknowledgement.ConfirmedPrivateTransferAck;
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.EncodedValue;
 import com.serotonin.bacnet4j.type.constructed.Address;
-import com.serotonin.bacnet4j.type.constructed.Sequence;
-import com.serotonin.bacnet4j.type.primitive.Null;
+import com.serotonin.bacnet4j.type.enumerated.ErrorClass;
+import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
+import com.serotonin.bacnet4j.type.error.ConfirmedPrivateTransferError;
+import com.serotonin.bacnet4j.type.error.ErrorClassAndCode;
+import com.serotonin.bacnet4j.type.primitive.CharacterString;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
@@ -58,16 +64,10 @@ public class ConfirmedPrivateTransferRequest extends ConfirmedRequestService {
         this.serviceParameters = serviceParameters;
     }
 
-    @Override
-    public byte getChoiceId() {
-        return TYPE_ID;
-    }
-
-    @Override
-    public AcknowledgementService handle(final LocalDevice localDevice, final Address from) {
-        localDevice.getEventHandler().firePrivateTransfer(from, vendorId, serviceNumber, (Sequence) serviceParameters);
-        // TODO the handler should return the result block, rather than using null here.
-        return new ConfirmedPrivateTransferAck(vendorId, serviceNumber, Null.instance);
+    ConfirmedPrivateTransferRequest(final ByteQueue queue) throws BACnetException {
+        vendorId = read(queue, UnsignedInteger.class, 0);
+        serviceNumber = read(queue, UnsignedInteger.class, 1);
+        serviceParameters = readEncodedValue(queue, 2);
     }
 
     @Override
@@ -77,11 +77,26 @@ public class ConfirmedPrivateTransferRequest extends ConfirmedRequestService {
         writeOptional(queue, serviceParameters, 2);
     }
 
-    ConfirmedPrivateTransferRequest(final ByteQueue queue) throws BACnetException {
-        vendorId = read(queue, UnsignedInteger.class, 0);
-        serviceNumber = read(queue, UnsignedInteger.class, 1);
-        serviceParameters = readVendorSpecific(queue, vendorId, serviceNumber,
-                LocalDevice.vendorServiceRequestResolutions, 2);
+    @Override
+    public byte getChoiceId() {
+        return TYPE_ID;
+    }
+
+    @Override
+    public AcknowledgementService handle(final LocalDevice localDevice, final Address from) throws BACnetException {
+        final PrivateTransferHandler handler = localDevice.getPrivateTransferHandler(vendorId, serviceNumber);
+
+        if (handler == null) {
+            throw new BACnetErrorException(TYPE_ID,
+                    new ConfirmedPrivateTransferError(
+                            new ErrorClassAndCode(ErrorClass.services, ErrorCode.optionalFunctionalityNotSupported),
+                            vendorId, serviceNumber, new CharacterString("No handler for vendorId/serviceNumber")));
+        }
+
+        final Encodable resultBlock = handler.handle(localDevice, from, vendorId, serviceNumber,
+                (EncodedValue) serviceParameters, true);
+
+        return new ConfirmedPrivateTransferAck(vendorId, serviceNumber, resultBlock);
     }
 
     public UnsignedInteger getVendorId() {

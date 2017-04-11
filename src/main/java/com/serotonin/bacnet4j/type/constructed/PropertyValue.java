@@ -65,8 +65,9 @@ public class PropertyValue extends BaseType {
         return propertyIdentifier;
     }
 
-    public Encodable getValue() {
-        return value;
+    @SuppressWarnings("unchecked")
+    public <T extends Encodable> T getValue() {
+        return (T) value;
     }
 
     @Override
@@ -140,7 +141,7 @@ public class PropertyValue extends BaseType {
     //        private UnsignedInteger priority; // 3 optional
     //
     //        public Builder(PropertyIdentifier propertyIdentifier, Encodable value) {
-    //            
+    //
     //        }
     //    }
 }

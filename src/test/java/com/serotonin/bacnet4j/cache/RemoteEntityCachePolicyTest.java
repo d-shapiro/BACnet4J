@@ -3,22 +3,22 @@ package com.serotonin.bacnet4j.cache;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Calendar;
-
 import org.junit.Test;
 
 import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.npdu.test.TestNetwork;
-import com.serotonin.bacnet4j.obj.TestClock;
+import com.serotonin.bacnet4j.npdu.test.TestNetworkMap;
 import com.serotonin.bacnet4j.transport.DefaultTransport;
 
+import lohbihler.warp.WarpClock;
+
 public class RemoteEntityCachePolicyTest {
+    private final TestNetworkMap map = new TestNetworkMap();
+
     @Test
     public void test() {
-        final TestClock clock = new TestClock();
-
-        final LocalDevice d = new LocalDevice(0, new DefaultTransport(new TestNetwork(1, 10)));
-        d.setClock(clock);
+        final WarpClock clock = new WarpClock();
+        final LocalDevice d = new LocalDevice(0, new DefaultTransport(new TestNetwork(map, 1, 10))).withClock(clock);
 
         final Object neverCache = RemoteEntityCachePolicy.NEVER_CACHE.prepareState(d);
         final Object state5Seconds = RemoteEntityCachePolicy.EXPIRE_5_SECONDS.prepareState(d);
@@ -39,7 +39,7 @@ public class RemoteEntityCachePolicyTest {
         assertFalse(RemoteEntityCachePolicy.NEVER_EXPIRE.hasExpired(d, neverExpire));
 
         // Advance the clock 10 seconds
-        clock.add(Calendar.SECOND, 10);
+        clock.plusSeconds(10);
 
         assertTrue(RemoteEntityCachePolicy.NEVER_CACHE.hasExpired(d, neverCache));
         assertTrue(RemoteEntityCachePolicy.EXPIRE_5_SECONDS.hasExpired(d, state5Seconds));
@@ -51,7 +51,7 @@ public class RemoteEntityCachePolicyTest {
         assertFalse(RemoteEntityCachePolicy.NEVER_EXPIRE.hasExpired(d, neverExpire));
 
         // Advance the clock 1 minute
-        clock.add(Calendar.MINUTE, 1);
+        clock.plusMinutes(1);
 
         assertTrue(RemoteEntityCachePolicy.NEVER_CACHE.hasExpired(d, neverCache));
         assertTrue(RemoteEntityCachePolicy.EXPIRE_5_SECONDS.hasExpired(d, state5Seconds));
@@ -63,7 +63,7 @@ public class RemoteEntityCachePolicyTest {
         assertFalse(RemoteEntityCachePolicy.NEVER_EXPIRE.hasExpired(d, neverExpire));
 
         // Advance the clock 15 minutes
-        clock.add(Calendar.MINUTE, 15);
+        clock.plusMinutes(15);
 
         assertTrue(RemoteEntityCachePolicy.NEVER_CACHE.hasExpired(d, neverCache));
         assertTrue(RemoteEntityCachePolicy.EXPIRE_5_SECONDS.hasExpired(d, state5Seconds));
@@ -75,7 +75,7 @@ public class RemoteEntityCachePolicyTest {
         assertFalse(RemoteEntityCachePolicy.NEVER_EXPIRE.hasExpired(d, neverExpire));
 
         // Advance the clock 45 minutes
-        clock.add(Calendar.MINUTE, 45);
+        clock.plusMinutes(45);
 
         assertTrue(RemoteEntityCachePolicy.NEVER_CACHE.hasExpired(d, neverCache));
         assertTrue(RemoteEntityCachePolicy.EXPIRE_5_SECONDS.hasExpired(d, state5Seconds));
@@ -87,7 +87,7 @@ public class RemoteEntityCachePolicyTest {
         assertFalse(RemoteEntityCachePolicy.NEVER_EXPIRE.hasExpired(d, neverExpire));
 
         // Advance the clock 4 hours
-        clock.add(Calendar.HOUR, 4);
+        clock.plusHours(4);
 
         assertTrue(RemoteEntityCachePolicy.NEVER_CACHE.hasExpired(d, neverCache));
         assertTrue(RemoteEntityCachePolicy.EXPIRE_5_SECONDS.hasExpired(d, state5Seconds));
@@ -99,7 +99,7 @@ public class RemoteEntityCachePolicyTest {
         assertFalse(RemoteEntityCachePolicy.NEVER_EXPIRE.hasExpired(d, neverExpire));
 
         // Advance the clock 20 hours
-        clock.add(Calendar.HOUR, 20);
+        clock.plusHours(20);
 
         assertTrue(RemoteEntityCachePolicy.NEVER_CACHE.hasExpired(d, neverCache));
         assertTrue(RemoteEntityCachePolicy.EXPIRE_5_SECONDS.hasExpired(d, state5Seconds));
@@ -111,7 +111,7 @@ public class RemoteEntityCachePolicyTest {
         assertFalse(RemoteEntityCachePolicy.NEVER_EXPIRE.hasExpired(d, neverExpire));
 
         // Advance the clock 1 year
-        clock.add(Calendar.YEAR, 1);
+        clock.plusYears(1);
 
         assertTrue(RemoteEntityCachePolicy.NEVER_CACHE.hasExpired(d, neverCache));
         assertTrue(RemoteEntityCachePolicy.EXPIRE_5_SECONDS.hasExpired(d, state5Seconds));

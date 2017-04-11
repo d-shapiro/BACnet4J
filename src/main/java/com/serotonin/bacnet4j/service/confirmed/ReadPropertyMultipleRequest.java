@@ -159,7 +159,7 @@ public class ReadPropertyMultipleRequest extends ConfirmedRequestService {
         } else {
             // Get the specified property.
             try {
-                results.add(new Result(pid, pin, obj.getPropertyRequired(pid, pin)));
+                results.add(new Result(pid, pin, obj.readPropertyRequired(pid, pin)));
             } catch (final BACnetServiceException e) {
                 results.add(new Result(pid, pin, new ErrorClassAndCode(e.getErrorClass(), e.getErrorCode())));
             }

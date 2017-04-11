@@ -59,12 +59,25 @@ public class ProcessIdSelection extends BaseType {
         choice = readChoice(queue, choiceOptions);
     }
 
+    public boolean isNullValue() {
+        return choice.getDatum() instanceof Null;
+    }
+
     public Null getNullValue() {
         return choice.getDatum();
     }
 
+    public boolean isProcessIdentifier() {
+        return choice.getDatum() instanceof Unsigned32;
+    }
+
     public Unsigned32 getProcessIdentifier() {
         return choice.getDatum();
+    }
+
+    @Override
+    public String toString() {
+        return "ProcessIdSelection [choice=" + choice + "]";
     }
 
     @Override

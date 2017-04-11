@@ -42,8 +42,8 @@ public class OptionalBinaryPV extends BaseType {
 
     private final Choice choice;
 
-    public OptionalBinaryPV(final Null nullValue) {
-        this.choice = new Choice(nullValue, choiceOptions);
+    public OptionalBinaryPV() {
+        this.choice = new Choice(Null.instance, choiceOptions);
     }
 
     public OptionalBinaryPV(final BinaryPV binaryPV) {

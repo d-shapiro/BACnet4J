@@ -42,8 +42,8 @@ public class OptionalCharacterString extends BaseType {
 
     private final Choice choice;
 
-    public OptionalCharacterString(final Null nullValue) {
-        this.choice = new Choice(nullValue, choiceOptions);
+    public OptionalCharacterString() {
+        this.choice = new Choice(Null.instance, choiceOptions);
     }
 
     public OptionalCharacterString(final CharacterString characterString) {

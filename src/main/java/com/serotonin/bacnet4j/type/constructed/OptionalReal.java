@@ -42,8 +42,8 @@ public class OptionalReal extends BaseType {
 
     private final Choice choice;
 
-    public OptionalReal(final Null nullValue) {
-        this.choice = new Choice(nullValue, choiceOptions);
+    public OptionalReal() {
+        this.choice = new Choice(Null.instance, choiceOptions);
     }
 
     public OptionalReal(final Real real) {

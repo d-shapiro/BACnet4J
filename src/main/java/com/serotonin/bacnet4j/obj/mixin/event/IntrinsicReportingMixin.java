@@ -28,6 +28,8 @@
  */
 package com.serotonin.bacnet4j.obj.mixin.event;
 
+import java.util.function.Consumer;
+
 import com.serotonin.bacnet4j.obj.BACnetObject;
 import com.serotonin.bacnet4j.obj.mixin.event.eventAlgo.EventAlgorithm;
 import com.serotonin.bacnet4j.obj.mixin.event.faultAlgo.FaultAlgorithm;
@@ -47,19 +49,28 @@ import com.serotonin.bacnet4j.type.primitive.Boolean;
  */
 public class IntrinsicReportingMixin extends EventReportingMixin {
     // Configuration
+    private final PropertyIdentifier monitoredProperty;
     private final PropertyIdentifier[] triggerProperties;
 
     public IntrinsicReportingMixin(final BACnetObject bo, final EventAlgorithm eventAlgo,
-            final FaultAlgorithm faultAlgo, final PropertyIdentifier[] triggerProperties) {
+            final FaultAlgorithm faultAlgo, final PropertyIdentifier monitoredProperty,
+            final PropertyIdentifier[] triggerProperties) {
         super(bo, eventAlgo, faultAlgo);
 
-        bo.writePropertyInternal(PropertyIdentifier.reliabilityEvaluationInhibit, new Boolean(false));
+        bo.writePropertyInternal(PropertyIdentifier.reliabilityEvaluationInhibit, Boolean.FALSE);
 
+        this.monitoredProperty = monitoredProperty;
         this.triggerProperties = triggerProperties;
 
         // Update the state with the current values in the object.
         for (final PropertyIdentifier pid : triggerProperties)
             afterWriteProperty(pid, null, get(pid));
+    }
+
+    public IntrinsicReportingMixin withPostNotificationAction(
+            final Consumer<NotificationParameters> postNotificationAction) {
+        setPostNotificationAction(postNotificationAction);
+        return this;
     }
 
     @Override
@@ -68,8 +79,18 @@ public class IntrinsicReportingMixin extends EventReportingMixin {
         super.afterWriteProperty(pid, oldValue, newValue);
 
         if (pid.isOneOf(triggerProperties)) {
-            // Check if the value has changed to a fault value.
-            final boolean fault = executeFaultAlgo(oldValue, newValue);
+            // Get the monitored value, in case this isn't it.
+            final Encodable prev, curr;
+            if (pid.equals(monitoredProperty)) {
+                prev = oldValue;
+                curr = newValue;
+            } else {
+                prev = null;
+                curr = get(monitoredProperty);
+            }
+
+            // Check if there was a fault state transition.
+            final boolean fault = executeFaultAlgo(prev, curr);
             if (!fault) {
                 // Ensure there is no current fault.
                 final Reliability reli = get(PropertyIdentifier.reliability);

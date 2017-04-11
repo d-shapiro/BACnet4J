@@ -56,7 +56,7 @@ public class WritablePropertyOutOfServiceMixin extends AbstractMixin {
     }
 
     @Override
-    protected boolean writeProperty(final ValueSource valueSource, final PropertyValue value)
+    protected boolean validateProperty(final ValueSource valueSource, final PropertyValue value)
             throws BACnetServiceException {
         final Boolean outOfService = get(PropertyIdentifier.outOfService);
         if (!outOfService.booleanValue()) {

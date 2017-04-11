@@ -28,28 +28,19 @@
  */
 package com.serotonin.bacnet4j.type.error;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.exception.BACnetException;
-import com.serotonin.bacnet4j.service.VendorServiceKey;
 import com.serotonin.bacnet4j.type.Encodable;
-import com.serotonin.bacnet4j.type.SequenceDefinition;
-import com.serotonin.bacnet4j.type.constructed.BaseType;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
 public class ConfirmedPrivateTransferError extends BaseError {
-    public static final Map<VendorServiceKey, SequenceDefinition> vendorServiceResolutions = new HashMap<>();
-
     private final ErrorClassAndCode errorType;
     private final UnsignedInteger vendorId;
     private final UnsignedInteger serviceNumber;
     private final Encodable errorParameters;
 
     public ConfirmedPrivateTransferError(final ErrorClassAndCode errorType, final UnsignedInteger vendorId,
-            final UnsignedInteger serviceNumber, final BaseType errorParameters) {
+            final UnsignedInteger serviceNumber, final Encodable errorParameters) {
         this.errorType = errorType;
         this.vendorId = vendorId;
         this.serviceNumber = serviceNumber;
@@ -68,8 +59,7 @@ public class ConfirmedPrivateTransferError extends BaseError {
         errorType = read(queue, ErrorClassAndCode.class, 0);
         vendorId = read(queue, UnsignedInteger.class, 1);
         serviceNumber = read(queue, UnsignedInteger.class, 2);
-        errorParameters = readVendorSpecific(queue, vendorId, serviceNumber,
-                LocalDevice.vendorServiceRequestResolutions, 3);
+        errorParameters = readEncodedValue(queue, 3);
     }
 
     public ErrorClassAndCode getErrorType() {

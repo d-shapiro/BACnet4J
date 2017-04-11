@@ -63,6 +63,11 @@ public class SimpleACK extends AckAPDU {
     }
 
     @Override
+    public String toString() {
+        return "SimpleACK [serviceAckChoice=" + serviceAckChoice + ", originalInvokeId=" + originalInvokeId + "]";
+    }
+
+    @Override
     public int hashCode() {
         final int PRIME = 31;
         int result = 1;

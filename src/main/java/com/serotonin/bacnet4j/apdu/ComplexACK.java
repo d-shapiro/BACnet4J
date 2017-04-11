@@ -164,12 +164,16 @@ public class ComplexACK extends AckAPDU implements Segmentable {
         return originalInvokeId;
     }
 
+    public byte getServiceChoice() {
+        return serviceChoice;
+    }
+
     @Override
     public String toString() {
-        return "ComplexACK(segmentedMessage=" + segmentedMessage + ", moreFollows=" + moreFollows
-                + ", originalInvokeId=" + originalInvokeId + ", sequenceNumber=" + sequenceNumber
-                + ", proposedWindowSize=" + proposedWindowSize + ", serviceChoice=" + serviceChoice + ", service="
-                + service + ")";
+        return "ComplexACK [segmentedMessage=" + segmentedMessage + ", moreFollows=" + moreFollows + ", sequenceNumber="
+                + sequenceNumber + ", proposedWindowSize=" + proposedWindowSize + ", service=" + service
+                + ", serviceData=" + serviceData + ", serviceChoice=" + serviceChoice + ", originalInvokeId="
+                + originalInvokeId + "]";
     }
 
     @Override

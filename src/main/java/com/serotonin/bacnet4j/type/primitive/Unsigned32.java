@@ -33,7 +33,7 @@ import java.math.BigInteger;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
 public class Unsigned32 extends UnsignedInteger {
-    private static final long MAX = 0xffffffffl - 1;
+    private static final long MAX = 0xffffffffl;
 
     public Unsigned32(final int value) {
         super(value);

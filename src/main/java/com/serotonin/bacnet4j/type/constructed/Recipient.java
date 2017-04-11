@@ -28,6 +28,8 @@
  */
 package com.serotonin.bacnet4j.type.constructed;
 
+import com.serotonin.bacnet4j.LocalDevice;
+import com.serotonin.bacnet4j.RemoteDevice;
 import com.serotonin.bacnet4j.exception.BACnetException;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
@@ -72,6 +74,15 @@ public class Recipient extends BaseType {
 
     public Recipient(final ByteQueue queue) throws BACnetException {
         choice = new Choice(queue, choiceOptions);
+    }
+
+    public Address toAddress(final LocalDevice localDevice) throws BACnetException {
+        if (isAddress())
+            return getAddress();
+
+        final int deviceId = getDevice().getInstanceNumber();
+        final RemoteDevice rd = localDevice.getRemoteDevice(deviceId).get();
+        return rd.getAddress();
     }
 
     @Override

@@ -31,6 +31,7 @@ package com.serotonin.bacnet4j.type.primitive;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 
+import com.serotonin.bacnet4j.LocalDevice;
 import com.serotonin.bacnet4j.enums.DayOfWeek;
 import com.serotonin.bacnet4j.enums.Month;
 import com.serotonin.bacnet4j.exception.BACnetRuntimeException;
@@ -79,8 +80,10 @@ public class Date extends Primitive implements Comparable<Date>, DateMatchable {
             this.dayOfWeek = dayOfWeek;
     }
 
-    public Date() {
-        this(new GregorianCalendar());
+    public Date(final LocalDevice localDevice) {
+        final GregorianCalendar gc = new GregorianCalendar();
+        gc.setTimeInMillis(localDevice.getClock().millis());
+        resetTo(gc);
     }
 
     public Date(final GregorianCalendar gc) {

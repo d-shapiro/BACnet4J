@@ -23,7 +23,7 @@
  * without being obliged to provide the source code for any proprietary components.
  *
  * See www.infiniteautomation.com for commercial license options.
- * 
+ *
  * @author Matthew Lohbihler
  */
 package com.serotonin.bacnet4j.transport;
@@ -44,7 +44,7 @@ import com.serotonin.bacnet4j.type.primitive.OctetString;
 
 /**
  * Provides segmentation support for all data link types.
- * 
+ *
  * @author Matthew
  */
 public interface Transport {
@@ -91,7 +91,7 @@ public interface Transport {
 
     Map<Integer, OctetString> getNetworkRouters();
 
-    void send(Address address, UnconfirmedRequestService service, boolean broadcast);
+    void send(Address address, UnconfirmedRequestService service);
 
     ServiceFuture send(Address address, int maxAPDULengthAccepted, Segmentation segmentationSupported,
             ConfirmedRequestService service);

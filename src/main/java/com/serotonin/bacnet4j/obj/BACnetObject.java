@@ -35,12 +35,15 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.serotonin.bacnet4j.LocalDevice;
-import com.serotonin.bacnet4j.exception.BACnetRuntimeException;
 import com.serotonin.bacnet4j.exception.BACnetServiceException;
 import com.serotonin.bacnet4j.obj.mixin.CommandableMixin;
 import com.serotonin.bacnet4j.obj.mixin.CovReportingMixin;
 import com.serotonin.bacnet4j.obj.mixin.HasStatusFlagsMixin;
+import com.serotonin.bacnet4j.obj.mixin.ObjectIdAndNameMixin;
 import com.serotonin.bacnet4j.obj.mixin.PropertyListMixin;
 import com.serotonin.bacnet4j.obj.mixin.event.IntrinsicReportingMixin;
 import com.serotonin.bacnet4j.service.acknowledgement.GetAlarmSummaryAck.AlarmSummary;
@@ -66,16 +69,16 @@ import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.CharacterString;
-import com.serotonin.bacnet4j.type.primitive.Date;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.Real;
-import com.serotonin.bacnet4j.type.primitive.Time;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
 /**
  * @author Matthew
  */
 public class BACnetObject {
+    static final Logger LOG = LoggerFactory.getLogger(BACnetObject.class);
+
     private final LocalDevice localDevice;
     private final ObjectType objectType;
     protected final Map<PropertyIdentifier, Encodable> properties = new ConcurrentHashMap<>();
@@ -87,6 +90,9 @@ public class BACnetObject {
     private HasStatusFlagsMixin hasStatusFlagsMixin;
     private IntrinsicReportingMixin intrinsicReportingMixin;
     private CovReportingMixin changeOfValueMixin;
+
+    // Configuration
+    private boolean deletable;
 
     public BACnetObject(final LocalDevice localDevice, final ObjectType type, final int instanceNumber)
             throws BACnetServiceException {
@@ -116,6 +122,7 @@ public class BACnetObject {
 
         // All objects have a property list.
         addMixin(new PropertyListMixin(this));
+        addMixin(new ObjectIdAndNameMixin(this));
 
         if (!id.getObjectType().equals(ObjectType.device))
             // The device object will add itself to the local device after it initializes.
@@ -141,8 +148,16 @@ public class BACnetObject {
         return name.getValue();
     }
 
-    LocalDevice getLocalDevice() {
+    public LocalDevice getLocalDevice() {
         return localDevice;
+    }
+
+    public boolean isDeletable() {
+        return deletable;
+    }
+
+    public void setDeletable(final boolean deletable) {
+        this.deletable = deletable;
     }
 
     //
@@ -152,7 +167,15 @@ public class BACnetObject {
     /**
      * Called when the object is removed from the device.
      */
-    public void terminate() {
+    final public void terminate() {
+        // Notify the mixins
+        for (final AbstractMixin mixin : mixins) {
+            mixin.terminate();
+        }
+        terminateImpl();
+    }
+
+    protected void terminateImpl() {
         // no op, override as required
     }
 
@@ -238,8 +261,8 @@ public class BACnetObject {
 
     //
     // COVs
-    protected void _supportCovReporting(final Real covIncrement) {
-        addMixin(new CovReportingMixin(this, covIncrement));
+    protected void _supportCovReporting(final Real covIncrement, final UnsignedInteger covPeriod) {
+        addMixin(new CovReportingMixin(this, covIncrement, covPeriod));
     }
 
     public AlarmSummary getAlarmSummary() {
@@ -283,42 +306,72 @@ public class BACnetObject {
     }
 
     //
+    // Persistence
+    public String getPersistenceKey(final PropertyIdentifier pid) {
+        return objectType.toString() + "." + getInstanceId() + "." + pid;
+    }
+
+    //
     //
     // Get property
     //
-    @SuppressWarnings("unchecked")
-    public final <T extends Encodable> T getProperty(final PropertyIdentifier pid) {
-        // Do some property-specific checking here.
-        if (PropertyIdentifier.localTime.equals(pid))
-            return (T) new Time();
-        if (PropertyIdentifier.localDate.equals(pid))
-            return (T) new Date();
-
-        // Give the mixins notice that the property is being read.
-        for (final AbstractMixin mixin : mixins)
-            mixin.beforeReadProperty(pid);
-
-        return (T) get(pid);
-    }
-
     /**
-     * This method should only be used internally. Services should use the getProperty method.
+     * This method should only be used internally. Services should use the getProperty method. This method circumvents
+     * all mixins and retrieves the property directly from the internal map.
      */
     @SuppressWarnings("unchecked")
     public <T extends Encodable> T get(final PropertyIdentifier pid) {
         return (T) properties.get(pid);
     }
 
-    public final Encodable getPropertyRequired(final PropertyIdentifier pid) throws BACnetServiceException {
-        final Encodable p = getProperty(pid);
+    /**
+     * Reads the given property. All mixins and the object are notified with beforeReadProperty prior to getting the
+     * value from the internal map.
+     *
+     * @param pid
+     * @return
+     * @throws BACnetServiceException
+     *             if the object objected to the read
+     */
+    @SuppressWarnings("unchecked")
+    public final <T extends Encodable> T readProperty(final PropertyIdentifier pid) throws BACnetServiceException {
+        // Give the mixins notice that the property is being read.
+        for (final AbstractMixin mixin : mixins)
+            mixin.beforeReadProperty(pid);
+        beforeReadProperty(pid);
+
+        return (T) get(pid);
+    }
+
+    /**
+     * Reads the given property. All mixins and the object are notified with beforeReadProperty prior to getting the
+     * value from the internal map. Will not return null.
+     *
+     * @param pid
+     * @return
+     * @throws BACnetServiceException
+     *             if the object objected to the read, or if the property was not found (was null).
+     */
+    public final Encodable readPropertyRequired(final PropertyIdentifier pid) throws BACnetServiceException {
+        final Encodable p = readProperty(pid);
         if (p == null)
             throw new BACnetServiceException(ErrorClass.property, ErrorCode.unknownProperty);
         return p;
     }
 
-    public final Encodable getProperty(final PropertyIdentifier pid, final UnsignedInteger propertyArrayIndex)
+    /**
+     * Reads the given one-based index of the array for the given pid. All mixins and the object are notified with
+     * beforeReadProperty prior to getting the value from the internal map.
+     *
+     * @param pid
+     * @param propertyArrayIndex
+     * @return
+     * @throws BACnetServiceException
+     *             if the object objected to the read
+     */
+    public final Encodable readProperty(final PropertyIdentifier pid, final UnsignedInteger propertyArrayIndex)
             throws BACnetServiceException {
-        final Encodable result = getProperty(pid);
+        final Encodable result = readProperty(pid);
         if (propertyArrayIndex == null)
             return result;
 
@@ -330,15 +383,25 @@ public class BACnetObject {
         if (index == 0)
             return new UnsignedInteger(array.getCount());
 
-        if (index > array.getCount())
+        if (index > array.size())
             throw new BACnetServiceException(ErrorClass.property, ErrorCode.invalidArrayIndex);
 
-        return array.get(index);
+        return array.getBase1(index);
     }
 
-    public final Encodable getPropertyRequired(final PropertyIdentifier pid, final UnsignedInteger propertyArrayIndex)
+    /**
+     * Reads the given one-based index of the array for the given pid. All mixins and the object are notified with
+     * beforeReadProperty prior to getting the value from the internal map. Will not return null.
+     *
+     * @param pid
+     * @param propertyArrayIndex
+     * @return
+     * @throws BACnetServiceException
+     *             if the object objected to the read, or if the property was not found (was null).
+     */
+    public final Encodable readPropertyRequired(final PropertyIdentifier pid, final UnsignedInteger propertyArrayIndex)
             throws BACnetServiceException {
-        final Encodable p = getProperty(pid, propertyArrayIndex);
+        final Encodable p = readProperty(pid, propertyArrayIndex);
         if (p == null)
             throw new BACnetServiceException(ErrorClass.property, ErrorCode.unknownProperty);
         return p;
@@ -348,40 +411,48 @@ public class BACnetObject {
     //
     // Set property
     //
-    public BACnetObject writeProperty(final ValueSource valueSource, final PropertyIdentifier pid,
-            final Encodable value) {
-        try {
-            writeProperty(valueSource, new PropertyValue(pid, value));
-        } catch (final BACnetServiceException e) {
-            throw new BACnetRuntimeException(e);
-        }
-        return this;
-    }
-
-    public BACnetObject writeProperty(final ValueSource valueSource, final PropertyIdentifier pid, final int indexBase1,
-            final Encodable value) {
-        try {
-            writeProperty(valueSource, new PropertyValue(pid, new UnsignedInteger(indexBase1), value, null));
-        } catch (final BACnetServiceException e) {
-            throw new BACnetRuntimeException(e);
-        }
-        return this;
+    /**
+     * Write a property with no notifications. Circumvents the object and all mixins for validations, handling, and
+     * post-write notifications.
+     *
+     * @param pid
+     * @param value
+     */
+    protected void set(final PropertyIdentifier pid, final Encodable value) {
+        properties.put(pid, value);
     }
 
     /**
-     * Entry point for writing a property via services. Provides validation and writing using mixins.
+     * Convenience method for writing a property with full validation, handling, and post-write notifications.
+     */
+    public BACnetObject writeProperty(final ValueSource valueSource, final PropertyIdentifier pid,
+            final Encodable value) throws BACnetServiceException {
+        return writeProperty(valueSource, new PropertyValue(pid, value));
+    }
+
+    /**
+     * Convenience method for writing a property with full validation, handling, and post-write notifications.
+     */
+    public BACnetObject writeProperty(final ValueSource valueSource, final PropertyIdentifier pid, final int indexBase1,
+            final Encodable value) throws BACnetServiceException {
+        return writeProperty(valueSource, new PropertyValue(pid, new UnsignedInteger(indexBase1), value, null));
+    }
+
+    /**
+     * Entry point for writing a property via services. Provides validation, write handling, and post-write
+     * notifications via the object itself and mixins.
      *
      * @param value
+     * @return
      * @throws BACnetServiceException
      */
     @SuppressWarnings("unchecked")
-    public void writeProperty(final ValueSource valueSource, final PropertyValue value) throws BACnetServiceException {
+    public BACnetObject writeProperty(final ValueSource valueSource, final PropertyValue value)
+            throws BACnetServiceException {
         final PropertyIdentifier pid = value.getPropertyIdentifier();
         final UnsignedInteger pin = value.getPropertyArrayIndex();
         Encodable valueToWrite = value.getValue();
 
-        if (PropertyIdentifier.objectIdentifier.equals(pid))
-            throw new BACnetServiceException(ErrorClass.property, ErrorCode.writeAccessDenied);
         if (PropertyIdentifier.objectType.equals(pid))
             throw new BACnetServiceException(ErrorClass.property, ErrorCode.writeAccessDenied);
         if (PropertyIdentifier.priorityArray.equals(pid))
@@ -394,6 +465,8 @@ public class BACnetObject {
             if (handled)
                 break;
         }
+        if (!handled)
+            handled = validateProperty(valueSource, value);
 
         if (!handled) {
             // Validate the value to be written. First get the definition for the property.
@@ -402,8 +475,12 @@ public class BACnetObject {
             if (pin == null) {
                 // Not writing to an array index.
                 if (def == null) {
+                    if (pid.intValue() < 512) {
+                        // There should be a definition for any property with an id in the ASHRAE range.
+                        throw new BACnetServiceException(ErrorClass.property, ErrorCode.unknownProperty);
+                    }
                     if (value.getValue().getClass() == SequenceOf.class) {
-                        // if the value to write is a collection, then disallow the write because we can't tell if it
+                        // If the value to write is a collection, then disallow the write because we can't tell if it
                         // is supposed to be a list or an array.
                         throw new BACnetServiceException(ErrorClass.property, ErrorCode.datatypeNotSupported);
                     }
@@ -453,8 +530,9 @@ public class BACnetObject {
             } else {
                 // Writing to an array index.
                 final Encodable prop = properties.get(pid);
-                if (prop == null)
+                if (prop == null) {
                     throw new BACnetServiceException(ErrorClass.property, ErrorCode.unknownProperty);
+                }
                 if (!(prop instanceof BACnetArray)) {
                     throw new BACnetServiceException(ErrorClass.property, ErrorCode.propertyIsNotAnArray);
                 }
@@ -464,7 +542,7 @@ public class BACnetObject {
                     // No property definition available, but we can check that the data type to write matches that
                     // of any existing elements.
                     if (arr.getCount() > 0) {
-                        if (arr.get(1).getClass() != value.getValue().getClass()) {
+                        if (arr.getBase1(1).getClass() != value.getValue().getClass()) {
                             throw new BACnetServiceException(ErrorClass.property, ErrorCode.invalidDataType);
                         }
                     }
@@ -495,16 +573,18 @@ public class BACnetObject {
             } else {
                 // Set the value in an array.
                 final BACnetArray<Encodable> arr = (BACnetArray<Encodable>) properties.get(pid);
-                arr.set(pin.intValue(), valueToWrite);
+                arr.setBase1(pin.intValue(), valueToWrite);
                 writePropertyInternal(pid, arr);
             }
         }
+
+        return this;
     }
 
     /**
-     * Entry point for changing a property circumventing mixin support. Used primarily for object configuration and
-     * property writes from mixins themselves, but can also be used by client code to set object properties. Calls mixin
-     * "after write" methods and fires COV subscriptions.
+     * Entry point for changing a property circumventing object/mixin validation and write handling. Used primarily for
+     * object configuration and property writes from mixins themselves, but can also be used by client code to set
+     * object properties. Calls mixin "after write" methods and fires COV subscriptions.
      *
      * @param pid
      * @param value
@@ -512,11 +592,12 @@ public class BACnetObject {
      */
     public BACnetObject writePropertyInternal(final PropertyIdentifier pid, final Encodable value) {
         final Encodable oldValue = properties.get(pid);
-        properties.put(pid, value);
+        set(pid, value);
 
         // After writing.
         for (final AbstractMixin mixin : mixins)
             mixin.afterWriteProperty(pid, oldValue, value);
+        afterWriteProperty(pid, oldValue, value);
 
         if (!Objects.equals(value, oldValue)) {
             // Notify listeners
@@ -525,6 +606,42 @@ public class BACnetObject {
         }
 
         return this;
+    }
+
+    /**
+     * Allows the object itself to validate the property before being written.
+     *
+     * @param valueSource
+     * @param value
+     * @return true if no more validation should occur, including the generic data type validation.
+     * @throws BACnetServiceException
+     *             to abort the write.
+     */
+    protected boolean validateProperty(final ValueSource valueSource, final PropertyValue value)
+            throws BACnetServiceException {
+        return false;
+    }
+
+    /**
+     * Allows notification to the object itself of a property write, in the same manner as it works for mixins.
+     *
+     * @param pid
+     * @param oldValue
+     * @param newValue
+     */
+    protected void afterWriteProperty(final PropertyIdentifier pid, final Encodable oldValue,
+            final Encodable newValue) {
+        // no op
+    }
+
+    /**
+     * Allows notification to the object itself before a property read.
+     *
+     * @param pid
+     * @throws BACnetServiceException
+     */
+    protected void beforeReadProperty(final PropertyIdentifier pid) throws BACnetServiceException {
+        // no op
     }
 
     //
