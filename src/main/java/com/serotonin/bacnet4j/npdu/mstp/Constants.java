@@ -126,7 +126,7 @@ public class Constants {
      * begin using a token or replying to a Poll For Master frame: 20 milliseconds. (Implementations may use larger
      * values for this timeout, not to exceed 100 milliseconds.)
      */
-    public static final int USAGE_TIMEOUT = 20;
+    public static final int USAGE_TIMEOUT = 30;
 
     public static final byte BROADCAST = (byte) 0xFF;
 }
