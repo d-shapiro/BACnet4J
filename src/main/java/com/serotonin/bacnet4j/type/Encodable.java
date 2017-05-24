@@ -382,8 +382,12 @@ abstract public class Encodable {
             return amb.convertTo(def.getClazz());
         }
 
-        if (propertyArrayIndex == null && def.isCollection()) {
-            return readSequenceOf(queue, def.getClazz(), contextId);
+        if (propertyArrayIndex == null) {
+        	if (def.isCollection()) {
+        		return readSequenceOf(queue, def.getClazz(), contextId);
+        	} else if (SequenceOf.class.isAssignableFrom(def.getClazz())) {
+        		return readSequenceType(queue, def.getClazz(), contextId);
+        	}
         }
 
         //        final int primitiveTypeId = Primitive.getPrimitiveTypeId(queue.peek(getTagLength(queue)));
