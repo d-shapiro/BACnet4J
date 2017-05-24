@@ -78,6 +78,8 @@ public class FileObject extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.fileType, new CharacterString(fileType));
         writePropertyInternal(PropertyIdentifier.fileAccessMethod, fileAccess.getAccessMethod());
         writePropertyInternal(PropertyIdentifier.archive, Boolean.FALSE);
+
+        localDevice.addObject(this);
     }
 
     public ReentrantLock getLock() {

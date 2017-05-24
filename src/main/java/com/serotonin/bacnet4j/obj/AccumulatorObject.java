@@ -99,6 +99,8 @@ public class AccumulatorObject extends BACnetObject {
         // TODO
         // ?? Logging_Record
         // ?? Logging_Object -> not currently possible to know what is making a request to read a property.
+
+        localDevice.addObject(this);
     }
 
     public AccumulatorObject supportIntrinsicReporting(final int highLimit, final int lowLimit,

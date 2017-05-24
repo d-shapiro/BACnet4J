@@ -169,6 +169,10 @@ public class RemoteDeviceFinder {
                     throw new CancellationException();
                 if (remoteDevice != null)
                     return remoteDevice;
+
+                // done() was not call, so ensure that the listener is removed from the event handler
+                localDevice.getEventHandler().removeListener(listener);
+
                 throw new BACnetTimeoutException("No response from instanceId " + instanceId);
             }
         }

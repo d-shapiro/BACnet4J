@@ -185,6 +185,8 @@ public class EventEnrollmentObject extends BACnetObject {
         // Start polling
         pollingFuture = localDevice.scheduleWithFixedDelay(() -> doPoll(), pollDelayMillis, pollDelayMillis,
                 TimeUnit.MILLISECONDS);
+
+        localDevice.addObject(this);
     }
 
     @Override

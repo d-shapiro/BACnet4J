@@ -253,7 +253,7 @@ public class BBMDTest {
         //   - 127.0.1.2 (original)
         //   - 127.0.1.3 (original)
         ld11.ld.sendLocalBroadcast(ld11.ld.getIAm());
-        clock.plus(100, TimeUnit.MILLISECONDS, 100);
+        clock.plus(100, TimeUnit.MILLISECONDS, 200);
 
         // Confirm that the broadcast was received across the B/N network
         assertEquals(0, ld11.iamCount());
@@ -346,7 +346,7 @@ public class BBMDTest {
         assertEquals(1, fd153.iamCount());
         reset();
 
-        // ********** TEST 7 **********
+        // ********** TEST 6 **********
         // ***** Send a broadcast from 127.0.152.1 *****
         // - 127.0.153.1
         //   - 127.0.2.2 (distribute broadcast to network)
@@ -446,7 +446,7 @@ public class BBMDTest {
         final LDInfo info = new LDInfo();
 
         info.network = new IpNetworkBuilder().withLocalBindAddress("127.0." + subnet + "." + addr) //
-                .withSubnetMask("255.255.255.0") //
+                .withSubnet("127.0." + subnet + ".0", 24) //
                 .withLocalNetworkNumber(1) //
                 .build();
 

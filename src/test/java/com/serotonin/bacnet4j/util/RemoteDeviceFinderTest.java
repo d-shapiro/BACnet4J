@@ -73,26 +73,42 @@ public class RemoteDeviceFinderTest {
 
         // Ensure extended information
         assertEquals(236, discovered1.getVendorIdentifier());
+
+        assertEquals(0, d1.getEventHandler().getListenerCount());
+        assertEquals(0, d2.getEventHandler().getListenerCount());
+        assertEquals(0, d3.getEventHandler().getListenerCount());
     }
 
     @Test(expected = CancellationException.class)
     public void cancel() throws CancellationException, BACnetException {
-        final RemoteDeviceFuture future = RemoteDeviceFinder.findDevice(d1, 2);
-        future.cancel();
-        future.get();
+        try {
+            final RemoteDeviceFuture future = RemoteDeviceFinder.findDevice(d1, 2);
+            future.cancel();
+            future.get();
+        } finally {
+            assertEquals(0, d1.getEventHandler().getListenerCount());
+        }
     }
 
     @Test(expected = CancellationException.class)
     public void cancelAfterWait() throws CancellationException, BACnetException {
-        final RemoteDeviceFuture future = RemoteDeviceFinder.findDevice(d2, 3);
-        d2.schedule(() -> future.cancel(), 1, TimeUnit.MILLISECONDS);
-        future.get();
+        try {
+            final RemoteDeviceFuture future = RemoteDeviceFinder.findDevice(d2, 3);
+            d2.schedule(() -> future.cancel(), 1, TimeUnit.MILLISECONDS);
+            future.get();
+        } finally {
+            assertEquals(0, d2.getEventHandler().getListenerCount());
+        }
     }
 
     @Test(expected = BACnetTimeoutException.class)
     public void timeout() throws CancellationException, BACnetException {
-        final RemoteDeviceFuture future = RemoteDeviceFinder.findDevice(d3, 4);
-        future.get(100);
+        try {
+            final RemoteDeviceFuture future = RemoteDeviceFinder.findDevice(d3, 4);
+            future.get(100);
+        } finally {
+            assertEquals(0, d3.getEventHandler().getListenerCount());
+        }
     }
 
     @Test
@@ -143,6 +159,10 @@ public class RemoteDeviceFinderTest {
         assertEquals(2, discovered6.get().getInstanceNumber());
 
         assertEquals(true, finallyCalled.get());
+
+        assertEquals(0, d1.getEventHandler().getListenerCount());
+        assertEquals(0, d2.getEventHandler().getListenerCount());
+        assertEquals(0, d3.getEventHandler().getListenerCount());
     }
 
     @Test
@@ -166,5 +186,7 @@ public class RemoteDeviceFinderTest {
 
         assertEquals(true, timeout.get());
         assertEquals(true, finallyCalled.get());
+
+        assertEquals(0, d1.getEventHandler().getListenerCount());
     }
 }

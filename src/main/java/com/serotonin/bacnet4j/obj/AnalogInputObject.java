@@ -69,6 +69,8 @@ public class AnalogInputObject extends BACnetObject {
         addMixin(new ReadOnlyPropertyMixin(this, PropertyIdentifier.eventMessageTexts, PropertyIdentifier.resolution,
                 PropertyIdentifier.ackedTransitions, PropertyIdentifier.eventTimeStamps,
                 PropertyIdentifier.interfaceValue));
+
+        localDevice.addObject(this);
     }
 
     public AnalogInputObject supportIntrinsicReporting(final int timeDelay, final int notificationClass,

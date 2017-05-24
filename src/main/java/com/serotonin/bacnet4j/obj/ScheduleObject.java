@@ -147,6 +147,8 @@ public class ScheduleObject extends BACnetObject {
         // initialization of the objects in the list, force a write.
         if (Objects.equals(oldValue, newValue))
             doWrites(newValue);
+
+        localDevice.addObject(this);
     }
 
     public void supportIntrinsicReporting(final int notificationClass, final EventTransitionBits eventEnable,

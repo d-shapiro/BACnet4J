@@ -73,6 +73,13 @@ public class CommandableMixin extends AbstractMixin {
     private final PropertyIdentifier pvProperty;
 
     private boolean overridden;
+
+    /**
+     * Determines if the pv property is writable when the object is not commandable, and it is in service. If this
+     * is true, writes will be allowed. If false, writes will fail with property/write-access-denied.
+     */
+    private boolean supportsWritable;
+
     private boolean supportsCommandable;
     private boolean supportsValueSource;
 
@@ -90,6 +97,14 @@ public class CommandableMixin extends AbstractMixin {
 
     public void setOverridden(final boolean overridden) {
         this.overridden = overridden;
+    }
+
+    public void supportWritable() {
+        supportsWritable = true;
+    }
+
+    public boolean supportsWritable() {
+        return supportsWritable;
     }
 
     public void supportCommandable(final Encodable relqDefault) {
@@ -177,9 +192,7 @@ public class CommandableMixin extends AbstractMixin {
             final Boolean oos = get(outOfService);
             if (oos.booleanValue()) {
                 // Writable while the object is out of service.
-                writePropertyInternal(pvProperty, value.getValue());
-                if (supportsValueSource)
-                    writePropertyInternal(PropertyIdentifier.valueSource, valueSource);
+                directPVWrite(valueSource, value);
                 return true;
             }
 
@@ -188,12 +201,28 @@ public class CommandableMixin extends AbstractMixin {
                 return true;
             }
 
-            // Not writable while the object is in service and not commandable.
-            // ?? Is this correct, or should this be configurably allowable?
-            throw new BACnetServiceException(ErrorClass.property, ErrorCode.writeAccessDenied);
+            // Not commandable. Return an error if a priority was specified.
+            if (value.getPriority() != null) {
+                throw new BACnetServiceException(ErrorClass.property, ErrorCode.writeAccessDenied);
+            }
+
+            // If the object does not support writable, return an error.
+            if (!supportsWritable) {
+                throw new BACnetServiceException(ErrorClass.property, ErrorCode.writeAccessDenied);
+            }
+
+            // Allow the direct write to the pv property.
+            directPVWrite(valueSource, value);
+            return true;
         }
 
         return false;
+    }
+
+    private void directPVWrite(final ValueSource valueSource, final PropertyValue value) {
+        writePropertyInternal(pvProperty, value.getValue());
+        if (supportsValueSource)
+            writePropertyInternal(PropertyIdentifier.valueSource, valueSource);
     }
 
     @Override

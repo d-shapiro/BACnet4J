@@ -85,6 +85,8 @@ public class BinaryOutputObject extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.interfaceValue, new OptionalBinaryPV());
 
         addMixin(new StateChangeMixin(this));
+
+        localDevice.addObject(this);
     }
 
     public BinaryOutputObject supportIntrinsicReporting(final int timeDelay, final int notificationClass,

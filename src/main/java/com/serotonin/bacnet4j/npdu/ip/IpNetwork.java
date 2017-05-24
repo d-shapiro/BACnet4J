@@ -28,14 +28,11 @@
  */
 package com.serotonin.bacnet4j.npdu.ip;
 
-import static com.serotonin.bacnet4j.npdu.ip.IpNetworkUtils.toIpAddrString;
-
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.InterfaceAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -71,15 +68,12 @@ public class IpNetwork extends Network implements Runnable {
     public static final byte BVLC_TYPE = (byte) 0x81;
     public static final int DEFAULT_PORT = 0xBAC0; // == 47808
     public static final String DEFAULT_BIND_IP = "0.0.0.0";
-    // Probably not a good choice as a default subnet mask, but it suits the default broadcast ip which should
-    // not be changed due to backward compatibility.
-    public static final String DEFAULT_SUBNET_MASK = "0.0.0.0";
 
     private static final int MESSAGE_LENGTH = 2048;
 
     private final int port;
     private final String localBindAddressStr;
-    private final String broadcastIp;
+    private final String broadcastAddressStr;
     private final String subnetMaskStr;
     private final boolean reuseAddress;
 
@@ -107,39 +101,14 @@ public class IpNetwork extends Network implements Runnable {
     /**
      * Use an IpNetworkBuilder to create instances.
      */
-    IpNetwork(final int port, final String localBindAddress, final String subnetMask, final Integer networkPrefixLength,
+    IpNetwork(final int port, final String localBindAddress, final String broadcastAddress, final String subnetMask,
             final int localNetworkNumber, final boolean reuseAddress) {
         super(localNetworkNumber);
         this.port = port;
+        this.localBindAddressStr = localBindAddress;
+        this.broadcastAddressStr = broadcastAddress;
+        this.subnetMaskStr = subnetMask;
         this.reuseAddress = reuseAddress;
-
-        if (localBindAddress == null) {
-            //|| localBindAddress.equals(DEFAULT_BIND_IP)) { removed because iAm responses are broadcasts and thus without this set some systems cannot recieve them
-            // It's problematic to not know what the local IP address is, so use utilities to try to determine it.
-            final List<InterfaceAddress> inetAddrs = IpNetworkUtils.getLocalInterfaceAddresses();
-            if (inetAddrs.isEmpty())
-                throw new RuntimeException("Unable to determine local inet address");
-            final InterfaceAddress iface = inetAddrs.get(0);
-
-            final long ipaddr = IpNetworkUtils.bytesToLong(iface.getAddress().getAddress());
-            final long subnet = IpNetworkUtils.createSubmask(iface.getNetworkPrefixLength());
-
-            localBindAddressStr = toIpAddrString(ipaddr);
-            subnetMaskStr = toIpAddrString(subnet);
-            broadcastIp = toIpAddrString(IpNetworkUtils.toBroadcast(ipaddr, subnet));
-        } else {
-            this.localBindAddressStr = localBindAddress;
-            if (subnetMask != null)
-                subnetMaskStr = subnetMask;
-            else if (networkPrefixLength != null)
-                subnetMaskStr = toIpAddrString(IpNetworkUtils.createSubmask(networkPrefixLength));
-            else
-                subnetMaskStr = DEFAULT_SUBNET_MASK;
-
-            final long ipaddr = IpNetworkUtils.bytesToLong(BACnetUtils.dottedStringToBytes(localBindAddress));
-            final long subnet = IpNetworkUtils.bytesToLong(BACnetUtils.dottedStringToBytes(subnetMaskStr));
-            broadcastIp = toIpAddrString(IpNetworkUtils.toBroadcast(ipaddr, subnet));
-        }
     }
 
     @Override
@@ -160,8 +129,8 @@ public class IpNetwork extends Network implements Runnable {
         return localBindAddress;
     }
 
-    public String getBroadcastIp() {
-        return broadcastIp;
+    public String getBroadcastAddresss() {
+        return broadcastAddressStr;
     }
 
     @Override
@@ -196,7 +165,7 @@ public class IpNetwork extends Network implements Runnable {
         socket.setBroadcast(true);
 
         //        broadcastAddress = new Address(broadcastIp, port, new Network(0xffff, new byte[0]));
-        broadcastMAC = IpNetworkUtils.toOctetString(broadcastIp, port);
+        broadcastMAC = IpNetworkUtils.toOctetString(broadcastAddressStr, port);
         subnetMask = BACnetUtils.dottedStringToBytes(subnetMaskStr);
 
         thread = new Thread(this, "BACnet4J IP socket listener");
@@ -218,7 +187,7 @@ public class IpNetwork extends Network implements Runnable {
     }
 
     public Address getBroadcastAddress(final int port) {
-        return IpNetworkUtils.toAddress(broadcastIp, port);
+        return IpNetworkUtils.toAddress(broadcastAddressStr, port);
     }
 
     /**
@@ -525,7 +494,7 @@ public class IpNetwork extends Network implements Runnable {
     public int hashCode() {
         final int prime = 31;
         int result = super.hashCode();
-        result = prime * result + (broadcastIp == null ? 0 : broadcastIp.hashCode());
+        result = prime * result + (broadcastAddressStr == null ? 0 : broadcastAddressStr.hashCode());
         result = prime * result + (localBindAddressStr == null ? 0 : localBindAddressStr.hashCode());
         result = prime * result + port;
         return result;
@@ -540,10 +509,10 @@ public class IpNetwork extends Network implements Runnable {
         if (getClass() != obj.getClass())
             return false;
         final IpNetwork other = (IpNetwork) obj;
-        if (broadcastIp == null) {
-            if (other.broadcastIp != null)
+        if (broadcastAddressStr == null) {
+            if (other.broadcastAddressStr != null)
                 return false;
-        } else if (!broadcastIp.equals(other.broadcastIp))
+        } else if (!broadcastAddressStr.equals(other.broadcastAddressStr))
             return false;
         if (localBindAddressStr == null) {
             if (other.localBindAddressStr != null)
@@ -695,7 +664,7 @@ public class IpNetwork extends Network implements Runnable {
         final byte[] toSend = fwd.popAll();
 
         if (doLocalBroadcast)
-            sendPacket(InetAddrCache.get(broadcastIp, port), toSend);
+            sendPacket(InetAddrCache.get(broadcastAddressStr, port), toSend);
 
         // Forward to all foreign devices.
         for (final FDTEntry fd : foreignDeviceTable)
@@ -893,7 +862,7 @@ public class IpNetwork extends Network implements Runnable {
         final byte[] toSend = fwd.popAll();
 
         // Send locally
-        sendPacket(InetAddrCache.get(broadcastIp, port), toSend);
+        sendPacket(InetAddrCache.get(broadcastAddressStr, port), toSend);
 
         try {
             // Send to all BDTs except own

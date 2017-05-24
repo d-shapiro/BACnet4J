@@ -213,6 +213,8 @@ public class DeviceObject extends BACnetObject {
         addMixin(new ReadOnlyPropertyMixin(this, PropertyIdentifier.activeCovSubscriptions,
                 PropertyIdentifier.localTime, PropertyIdentifier.localDate, PropertyIdentifier.deviceAddressBinding));
         addMixin(new ObjectListMixin(this));
+
+        localDevice.addObject(this);
     }
 
     public DeviceObject supportTimeSynchronization(final SequenceOf<Recipient> timeSynchronizationRecipients,

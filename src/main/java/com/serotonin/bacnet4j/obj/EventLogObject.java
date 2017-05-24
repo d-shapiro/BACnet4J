@@ -115,6 +115,8 @@ public class EventLogObject extends BACnetObject {
             }
         };
         localDevice.getEventHandler().addListener(eventListener);
+
+        localDevice.addObject(this);
     }
 
     public EventLogObject supportIntrinsicReporting(final int notificationThreshold, final int notificationClass,

@@ -49,6 +49,11 @@ public class PriorityArray extends SequenceOf<PriorityValue> {
         ensureLength();
     }
 
+    public PriorityArray(final ByteQueue queue) throws BACnetException {
+        super(queue, LENGTH, PriorityValue.class);
+        ensureLength();
+    }
+
     public PriorityArray(final ByteQueue queue, final int contextId) throws BACnetException {
         super(queue, PriorityValue.class, contextId);
         ensureLength();

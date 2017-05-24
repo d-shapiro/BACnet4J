@@ -46,7 +46,7 @@ import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.DeviceObjectPropertyReferences;
-import com.serotonin.bacnet4j.util.DevicesObjectPropertyValues;
+import com.serotonin.bacnet4j.util.DeviceObjectPropertyValues;
 import com.serotonin.bacnet4j.util.PropertyValues;
 
 /**
@@ -94,8 +94,6 @@ public class TrendLogObject extends BACnetObject {
             final boolean stopWhenFull, final int bufferSize) throws BACnetServiceException {
         super(localDevice, ObjectType.trendLog, instanceNumber, name);
 
-        Objects.requireNonNull(localDevice);
-        Objects.requireNonNull(name);
         Objects.requireNonNull(startTime);
         Objects.requireNonNull(stopTime);
         Objects.requireNonNull(logDeviceObjectProperty);
@@ -128,6 +126,8 @@ public class TrendLogObject extends BACnetObject {
 
         this.buffer = buffer;
         logDisabled = !allowLogging(getNow());
+
+        localDevice.addObject(this);
     }
 
     public TrendLogObject withPolled(final int logInterval, final TimeUnit logIntervalUnit,
@@ -628,7 +628,7 @@ public class TrendLogObject extends BACnetObject {
         final DateTime now = getNow();
 
         // Call the delegate to perform the poll.
-        final DevicesObjectPropertyValues result = pollingDelegate.doPoll();
+        final DeviceObjectPropertyValues result = pollingDelegate.doPoll();
 
         // Check the result.
         final DeviceObjectPropertyReference monitored = get(PropertyIdentifier.logDeviceObjectProperty);

@@ -45,7 +45,7 @@ import com.serotonin.bacnet4j.type.notificationParameters.BufferReadyNotif;
 import com.serotonin.bacnet4j.type.primitive.Boolean;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 import com.serotonin.bacnet4j.util.DeviceObjectPropertyReferences;
-import com.serotonin.bacnet4j.util.DevicesObjectPropertyValues;
+import com.serotonin.bacnet4j.util.DeviceObjectPropertyValues;
 import com.serotonin.bacnet4j.util.PropertyValues;
 
 public class TrendLogMultipleObject extends BACnetObject {
@@ -110,6 +110,8 @@ public class TrendLogMultipleObject extends BACnetObject {
 
         this.buffer = buffer;
         logDisabled = !allowLogging(getNow());
+
+        localDevice.addObject(this);
     }
 
     public TrendLogMultipleObject withPolled(final int logInterval, final TimeUnit logIntervalUnit,
@@ -456,7 +458,7 @@ public class TrendLogMultipleObject extends BACnetObject {
         final DateTime now = getNow();
 
         // Call the delegate to perform the poll.
-        final DevicesObjectPropertyValues result = pollingDelegate.doPoll();
+        final DeviceObjectPropertyValues result = pollingDelegate.doPoll();
 
         // Process the results.
         final List<LogDataElement> elements = new ArrayList<>();

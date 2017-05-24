@@ -13,7 +13,7 @@ import com.serotonin.bacnet4j.type.enumerated.ErrorCode;
 import com.serotonin.bacnet4j.type.error.ErrorClassAndCode;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.util.DeviceObjectPropertyReferences;
-import com.serotonin.bacnet4j.util.DevicesObjectPropertyValues;
+import com.serotonin.bacnet4j.util.DeviceObjectPropertyValues;
 import com.serotonin.bacnet4j.util.PropertyReferences;
 import com.serotonin.bacnet4j.util.PropertyUtils;
 
@@ -43,9 +43,9 @@ public class PollingDelegate {
         return remoteReferences;
     }
 
-    public DevicesObjectPropertyValues doPoll() {
+    public DeviceObjectPropertyValues doPoll() {
         // Get the remote properties first. If there are no remote properties this will return an empty values object.
-        final DevicesObjectPropertyValues result = PropertyUtils.readProperties(localDevice, remoteReferences, null);
+        final DeviceObjectPropertyValues result = PropertyUtils.readProperties(localDevice, remoteReferences, null);
 
         for (final Map.Entry<ObjectIdentifier, List<PropertyReference>> oidRefs : localReferences.getProperties()
                 .entrySet()) {

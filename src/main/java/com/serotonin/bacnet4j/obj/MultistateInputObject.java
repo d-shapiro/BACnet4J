@@ -61,6 +61,8 @@ public class MultistateInputObject extends BACnetObject {
         addMixin(
                 new ReadOnlyPropertyMixin(this, PropertyIdentifier.ackedTransitions, PropertyIdentifier.eventTimeStamps,
                         PropertyIdentifier.eventMessageTexts, PropertyIdentifier.interfaceValue));
+
+        localDevice.addObject(this);
     }
 
     public MultistateInputObject supportCovReporting() {

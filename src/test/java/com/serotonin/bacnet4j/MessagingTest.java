@@ -130,7 +130,6 @@ public class MessagingTest {
         assertEquals(PropertyIdentifier.objectList, result.getPropertyIdentifier());
         @SuppressWarnings("unchecked")
         final SequenceOf<ObjectIdentifier> idList = (SequenceOf<ObjectIdentifier>) result.getReadResult().getDatum();
-        System.out.println(idList);
         assertEquals(2, idList.getCount());
         assertEquals(d2.getId(), idList.getBase1(1));
         assertEquals(new ObjectIdentifier(ObjectType.analogValue, 0), idList.getBase1(2));
@@ -358,12 +357,14 @@ public class MessagingTest {
 
     private static BACnetObject createAnalogValue(final LocalDevice localDevice, final int id)
             throws BACnetServiceException {
-        return new BACnetObject(localDevice, ObjectType.analogValue, id) //
+        final BACnetObject bo = new BACnetObject(localDevice, ObjectType.analogValue, id) //
                 .writePropertyInternal(PropertyIdentifier.presentValue, new Real(3.14F)) //
                 .writePropertyInternal(PropertyIdentifier.units, EngineeringUnits.noUnits) //
                 .writePropertyInternal(PropertyIdentifier.outOfService, Boolean.FALSE) //
                 .writePropertyInternal(PropertyIdentifier.eventState, EventState.normal) //
                 .writePropertyInternal(PropertyIdentifier.statusFlags, new StatusFlags(false, false, false, false)) //
         ;
+        localDevice.addObject(bo);
+        return bo;
     }
 }

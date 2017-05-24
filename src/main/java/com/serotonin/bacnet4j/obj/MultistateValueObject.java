@@ -86,6 +86,8 @@ public class MultistateValueObject extends BACnetObject {
         if (!outOfService) {
             writePropertyInternal(PropertyIdentifier.outOfService, Boolean.valueOf(outOfService));
         }
+
+        localDevice.addObject(this);
     }
 
     public MultistateValueObject supportIntrinsicReporting(final int timeDelay, final int notificationClass,
@@ -128,6 +130,11 @@ public class MultistateValueObject extends BACnetObject {
 
     public MultistateValueObject supportValueSource() {
         _supportValueSource();
+        return this;
+    }
+
+    public MultistateValueObject supportWritable() {
+        _supportWritable();
         return this;
     }
 }

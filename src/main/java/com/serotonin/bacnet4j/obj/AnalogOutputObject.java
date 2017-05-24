@@ -50,6 +50,8 @@ public class AnalogOutputObject extends BACnetObject {
 
         _supportCommandable(new Real(relinquishDefault));
         _supportValueSource();
+
+        localDevice.addObject(this);
     }
 
     public AnalogOutputObject supportCovReporting(final float covIncrement) {

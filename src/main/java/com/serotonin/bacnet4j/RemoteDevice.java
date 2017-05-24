@@ -212,7 +212,7 @@ public class RemoteDevice implements Serializable {
     }
 
     public int getMaxAPDULengthAccepted() {
-        return ((UnsignedInteger) getDeviceProperty(PropertyIdentifier.maxApduLengthAccepted)).intValue();
+        return getUnsignedIntegerProperty(PropertyIdentifier.maxApduLengthAccepted);
     }
 
     public Segmentation getSegmentationSupported() {
@@ -220,23 +220,37 @@ public class RemoteDevice implements Serializable {
     }
 
     public int getVendorIdentifier() {
-        return ((UnsignedInteger) getDeviceProperty(PropertyIdentifier.vendorIdentifier)).intValue();
+        return getUnsignedIntegerProperty(PropertyIdentifier.vendorIdentifier);
     }
 
     public String getVendorName() {
-        return ((CharacterString) getDeviceProperty(PropertyIdentifier.vendorName)).getValue();
+        return getCharacterStringProperty(PropertyIdentifier.vendorName);
     }
 
     public String getName() {
-        return ((CharacterString) getDeviceProperty(PropertyIdentifier.objectName)).getValue();
+        return getCharacterStringProperty(PropertyIdentifier.objectName);
     }
 
     public String getModelName() {
-        return ((CharacterString) getDeviceProperty(PropertyIdentifier.modelName)).getValue();
+        return getCharacterStringProperty(PropertyIdentifier.modelName);
     }
 
     public ServicesSupported getServicesSupported() {
         return (ServicesSupported) getDeviceProperty(PropertyIdentifier.protocolServicesSupported);
+    }
+
+    public int getUnsignedIntegerProperty(final PropertyIdentifier pid) {
+        final UnsignedInteger p = (UnsignedInteger) getDeviceProperty(pid);
+        if (p == null)
+            return -1;
+        return p.intValue();
+    }
+
+    public String getCharacterStringProperty(final PropertyIdentifier pid) {
+        final CharacterString p = (CharacterString) getDeviceProperty(pid);
+        if (p == null)
+            return null;
+        return p.getValue();
     }
 
     @Override

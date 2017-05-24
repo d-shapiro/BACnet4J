@@ -92,6 +92,8 @@ public class NotificationClassObject extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.statusFlags, new StatusFlags(false, false, false, false));
 
         addMixin(new HasStatusFlagsMixin(this));
+
+        localDevice.addObject(this);
     }
 
     public NotificationClassObject supportIntrinsicReporting(final EventTransitionBits eventEnable,

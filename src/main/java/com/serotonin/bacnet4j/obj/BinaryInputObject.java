@@ -52,6 +52,8 @@ public class BinaryInputObject extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.interfaceValue, new OptionalBinaryPV());
 
         addMixin(new StateChangeMixin(this));
+
+        localDevice.addObject(this);
     }
 
     public BinaryInputObject supportStateText(final String inactive, final String active) {

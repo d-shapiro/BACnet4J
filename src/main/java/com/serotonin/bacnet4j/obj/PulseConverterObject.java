@@ -72,6 +72,8 @@ public class PulseConverterObject extends BACnetObject {
                 PropertyIdentifier.reliability));
         addMixin(new ReadOnlyPropertyMixin(this, PropertyIdentifier.count, PropertyIdentifier.updateTime,
                 PropertyIdentifier.ackedTransitions, PropertyIdentifier.eventMessageTexts));
+
+        localDevice.addObject(this);
     }
 
     public PulseConverterObject supportIntrinsicReporting(final float highLimit, final float lowLimit,

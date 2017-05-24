@@ -5,7 +5,9 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
+import java.time.Clock;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -143,5 +145,40 @@ public class LocalDeviceTest {
 
         // Try to add the device manually, and ensure that this fails.
         ld.addObject(o);
+    }
+
+    @SuppressWarnings("unused")
+    @Test
+    public void getDeviceBlockingTimeout() throws Exception {
+        final LocalDevice d3 = new LocalDevice(3, new DefaultTransport(new TestNetwork(map, 3, 0))).withClock(clock)
+                .initialize();
+
+        final long start = Clock.systemUTC().millis();
+
+        try {
+            d3.getRemoteDeviceBlocking(4, 100);
+            fail();
+        } catch (final BACnetTimeoutException e) {
+            // Expected after 100ms.
+            assertTrue(Clock.systemUTC().millis() - start >= 100);
+        }
+
+        try {
+            d3.getRemoteDeviceBlocking(4, 1000);
+            fail();
+        } catch (final BACnetTimeoutException e) {
+            // Expected immediately.
+            assertTrue(Clock.systemUTC().millis() - start < 1000);
+        }
+
+        clock.plusMillis(30000);
+
+        try {
+            d3.getRemoteDeviceBlocking(4, 100);
+            fail();
+        } catch (final BACnetTimeoutException e) {
+            // Expected after 100ms.
+            assertTrue(Clock.systemUTC().millis() - start >= 100);
+        }
     }
 }

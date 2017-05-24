@@ -419,4 +419,38 @@ public class CommandableMixinTest extends AbstractTest {
     private static BACnetArray<TimeStamp> emptyCommandTimes() {
         return new BACnetArray<>(16, TimeStamp.UNSPECIFIED_TIME);
     }
+
+    @Test
+    public void writable() throws BACnetServiceException {
+        final BinaryValueObject bv = new BinaryValueObject(d1, 0, "bv", BinaryPV.inactive, false).supportWritable();
+
+        // Write with priority not allowed.
+        TestUtils.assertBACnetServiceException(() -> {
+            bv.writeProperty(null,
+                    new PropertyValue(PropertyIdentifier.presentValue, null, BinaryPV.active, new UnsignedInteger(12)));
+        }, ErrorClass.property, ErrorCode.writeAccessDenied);
+        assertEquals(BinaryPV.inactive, bv.readProperty(PropertyIdentifier.presentValue));
+
+        // Write without priority not allowed.
+        bv.writeProperty(null, PropertyIdentifier.presentValue, BinaryPV.active);
+        assertEquals(BinaryPV.active, bv.readProperty(PropertyIdentifier.presentValue));
+    }
+
+    @Test
+    public void notWritable() throws BACnetServiceException {
+        final BinaryValueObject bv = new BinaryValueObject(d1, 0, "bv", BinaryPV.inactive, false);
+
+        // Write with priority not allowed.
+        TestUtils.assertBACnetServiceException(() -> {
+            bv.writeProperty(null,
+                    new PropertyValue(PropertyIdentifier.presentValue, null, BinaryPV.active, new UnsignedInteger(12)));
+        }, ErrorClass.property, ErrorCode.writeAccessDenied);
+        assertEquals(BinaryPV.inactive, bv.readProperty(PropertyIdentifier.presentValue));
+
+        // Write without priority also not allowed.
+        TestUtils.assertBACnetServiceException(() -> {
+            bv.writeProperty(null, PropertyIdentifier.presentValue, BinaryPV.active);
+        }, ErrorClass.property, ErrorCode.writeAccessDenied);
+        assertEquals(BinaryPV.inactive, bv.readProperty(PropertyIdentifier.presentValue));
+    }
 }

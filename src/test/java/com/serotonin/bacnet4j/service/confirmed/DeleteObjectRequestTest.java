@@ -45,6 +45,7 @@ public class DeleteObjectRequestTest {
     public void moreErrorTypes() throws BACnetServiceException {
         // Ask for an object that isn't deletable
         final BACnetObject bo = new BACnetObject(localDevice, ObjectType.accessDoor, 0);
+        localDevice.addObject(bo);
 
         TestUtils.assertRequestHandleException( //
                 () -> new DeleteObjectRequest(bo.getId()).handle(localDevice, addr), ErrorClass.object,
@@ -55,6 +56,7 @@ public class DeleteObjectRequestTest {
     public void delete() throws Exception {
         // Ask for an object that isn't deletable
         final BACnetObject bo = new BACnetObject(localDevice, ObjectType.accessDoor, 0);
+        localDevice.addObject(bo);
         bo.setDeletable(true);
 
         new DeleteObjectRequest(bo.getId()).handle(localDevice, addr);

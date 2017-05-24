@@ -144,6 +144,13 @@ public class AbstractMixin {
     }
 
     /**
+     * Provides notice to the mixin that the object should initialize itself.
+     */
+    protected void initialize() {
+        // no op
+    }
+
+    /**
      * Provides notice to the mixin that the object was removed from the device.
      */
     protected void terminate() {

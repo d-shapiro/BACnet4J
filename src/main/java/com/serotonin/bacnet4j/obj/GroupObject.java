@@ -43,6 +43,8 @@ public class GroupObject extends BACnetObject {
         writePropertyInternal(PropertyIdentifier.listOfGroupMembers, listOfGroupMembers);
 
         addMixin(new ReadOnlyPropertyMixin(this, PropertyIdentifier.presentValue));
+
+        localDevice.addObject(this);
     }
 
     @Override

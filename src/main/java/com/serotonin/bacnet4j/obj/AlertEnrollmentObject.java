@@ -41,6 +41,8 @@ public class AlertEnrollmentObject extends BACnetObject {
 
         alertReporting = new AlertReportingMixin(this);
         addMixin(alertReporting);
+
+        localDevice.addObject(this);
     }
 
     public void issueAlert(final ObjectIdentifier alertSource, final int extendedEventType,

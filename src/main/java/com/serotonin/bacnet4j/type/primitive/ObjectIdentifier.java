@@ -28,6 +28,8 @@
  */
 package com.serotonin.bacnet4j.type.primitive;
 
+import java.util.Objects;
+
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.util.sero.ByteQueue;
 
@@ -43,6 +45,8 @@ public class ObjectIdentifier extends Primitive {
     }
 
     public ObjectIdentifier(final ObjectType objectType, final int instanceNumber) {
+        Objects.requireNonNull(objectType);
+
         if (instanceNumber < 0 || instanceNumber > 0x3FFFFF)
             throw new IllegalArgumentException("Illegal instance number: " + instanceNumber);
 

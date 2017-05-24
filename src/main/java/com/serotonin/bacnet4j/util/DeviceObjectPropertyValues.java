@@ -32,25 +32,26 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.serotonin.bacnet4j.type.Encodable;
+import com.serotonin.bacnet4j.type.constructed.PropertyReference;
 import com.serotonin.bacnet4j.type.enumerated.ObjectType;
 import com.serotonin.bacnet4j.type.enumerated.PropertyIdentifier;
 import com.serotonin.bacnet4j.type.primitive.ObjectIdentifier;
 import com.serotonin.bacnet4j.type.primitive.UnsignedInteger;
 
-public class DevicesObjectPropertyValues {
+public class DeviceObjectPropertyValues {
     private final Map<Integer, PropertyValues> values = new HashMap<>();
 
-    public DevicesObjectPropertyValues add(final int deviceId, final ObjectType objectType, final int objectNumber,
+    public DeviceObjectPropertyValues add(final int deviceId, final ObjectType objectType, final int objectNumber,
             final PropertyIdentifier pid, final int pin, final Encodable value) {
         return add(deviceId, new ObjectIdentifier(objectType, objectNumber), pid, new UnsignedInteger(pin), value);
     }
 
-    public DevicesObjectPropertyValues add(final int deviceId, final ObjectType objectType, final int objectNumber,
+    public DeviceObjectPropertyValues add(final int deviceId, final ObjectType objectType, final int objectNumber,
             final PropertyIdentifier pid, final UnsignedInteger pin, final Encodable value) {
         return add(deviceId, new ObjectIdentifier(objectType, objectNumber), pid, pin, value);
     }
 
-    public DevicesObjectPropertyValues add(final int deviceId, final ObjectIdentifier oid, final PropertyIdentifier pid,
+    public DeviceObjectPropertyValues add(final int deviceId, final ObjectIdentifier oid, final PropertyIdentifier pid,
             final UnsignedInteger pin, final Encodable value) {
         PropertyValues propertyValues = values.get(deviceId);
         if (propertyValues == null) {
@@ -63,6 +64,37 @@ public class DevicesObjectPropertyValues {
 
     public PropertyValues getPropertyValues(final int deviceId) {
         return values.get(deviceId);
+    }
+
+    //
+    // Get properties the same way that they were put into DeviceObjectPropertyReferences
+    //
+
+    public Encodable get(final int deviceId, final ObjectType objectType, final int objectNumber,
+            final PropertyIdentifier pid) {
+        return get(deviceId, new ObjectIdentifier(objectType, objectNumber), pid);
+    }
+
+    public Encodable get(final int deviceId, final ObjectIdentifier oid, final PropertyIdentifier pid) {
+        final PropertyValues propertyValues = getPropertyValues(deviceId);
+        if (propertyValues == null) {
+            return null;
+        }
+        return propertyValues.getNoErrorCheck(oid, pid);
+    }
+
+    public Encodable getIndex(final int deviceId, final ObjectType objectType, final int objectNumber,
+            final PropertyIdentifier pid, final int pin) {
+        return getIndex(deviceId, new ObjectIdentifier(objectType, objectNumber), pid, new UnsignedInteger(pin));
+    }
+
+    public Encodable getIndex(final int deviceId, final ObjectIdentifier oid, final PropertyIdentifier pid,
+            final UnsignedInteger pin) {
+        final PropertyValues propertyValues = getPropertyValues(deviceId);
+        if (propertyValues == null) {
+            return null;
+        }
+        return propertyValues.getNoErrorCheck(oid, new PropertyReference(pid, pin));
     }
 
     public int size() {
@@ -98,7 +130,7 @@ public class DevicesObjectPropertyValues {
             return false;
         if (getClass() != obj.getClass())
             return false;
-        final DevicesObjectPropertyValues other = (DevicesObjectPropertyValues) obj;
+        final DeviceObjectPropertyValues other = (DeviceObjectPropertyValues) obj;
         if (values == null) {
             if (other.values != null)
                 return false;

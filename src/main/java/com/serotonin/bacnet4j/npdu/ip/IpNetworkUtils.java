@@ -177,7 +177,7 @@ public class IpNetworkUtils {
         return (ba[0] & 0xffL) << 24 | (ba[1] & 0xffL) << 16 | (ba[2] & 0xffL) << 8 | ba[3] & 0xffL;
     }
 
-    public static long createSubmask(final int length) {
+    public static long createMask(final int length) {
         long l = 0;
         int shift = 31;
         for (int i = 0; i < length; i++) {

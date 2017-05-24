@@ -90,6 +90,8 @@ public class CalendarObject extends BACnetObject {
         // Delay until the top of the next hour, and then run every hour.
         presentValueRefresher = getLocalDevice().scheduleAtFixedRate(() -> updatePresentValue(), delay, hour,
                 TimeUnit.MILLISECONDS);
+
+        localDevice.addObject(this);
     }
 
     public int getTimeTolerance() {

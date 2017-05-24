@@ -61,7 +61,7 @@ public class PropertyUtils {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    public static DevicesObjectPropertyValues readProperties(final LocalDevice localDevice,
+    public static DeviceObjectPropertyValues readProperties(final LocalDevice localDevice,
             final DeviceObjectPropertyReferences refs, final ReadListener callback) {
         return readProperties(localDevice, refs, callback, 0);
     }
@@ -82,9 +82,9 @@ public class PropertyUtils {
      *            the default timeout.
      * @return
      */
-    public static DevicesObjectPropertyValues readProperties(final LocalDevice localDevice,
+    public static DeviceObjectPropertyValues readProperties(final LocalDevice localDevice,
             final DeviceObjectPropertyReferences refs, final ReadListener callback, final long deviceTimeout) {
-        final DevicesObjectPropertyValues result = new DevicesObjectPropertyValues();
+        final DeviceObjectPropertyValues result = new DeviceObjectPropertyValues();
 
         final Map<Integer, PropertyReferences> properties = refs.getProperties();
 
@@ -192,7 +192,7 @@ public class PropertyUtils {
 
     private static void requestPropertiesFromDevice(final LocalDevice localDevice, final int deviceId,
             final long deviceTimeout, final PropertyReferences propRefs, final ReadListener callback,
-            final DevicesObjectPropertyValues result, final AtomicInteger completedProperties,
+            final DeviceObjectPropertyValues result, final AtomicInteger completedProperties,
             final double totalProperties) {
         try {
             final RemoteDevice r = localDevice.getRemoteDevice(deviceId).get(deviceTimeout);
@@ -215,7 +215,7 @@ public class PropertyUtils {
         }
     }
 
-    private static void updateResultAndCallback(final DevicesObjectPropertyValues result, final ReadListener callback,
+    private static void updateResultAndCallback(final DeviceObjectPropertyValues result, final ReadListener callback,
             final int did, final ObjectIdentifier oid, final PropertyIdentifier pid, final UnsignedInteger pin,
             final Encodable value, final AtomicInteger completedProperties, final double totalProperties) {
         // Add it to the result list.
@@ -232,7 +232,7 @@ public class PropertyUtils {
 
     private static void requestRemoteDeviceProperties(final LocalDevice localDevice, final RemoteDevice rd,
             final PropertyReferences refs, final ReadListener callback, final AtomicInteger completedProperties,
-            final double totalProperties, final DevicesObjectPropertyValues result) throws BACnetTimeoutException {
+            final double totalProperties, final DeviceObjectPropertyValues result) throws BACnetTimeoutException {
         LOG.info("Properties to read from {}: {}", rd.getInstanceNumber(), refs.size());
 
         final AtomicInteger remaining = new AtomicInteger(refs.size());
