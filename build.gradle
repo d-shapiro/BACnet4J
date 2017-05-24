@@ -8,6 +8,7 @@ targetCompatibility = JavaVersion.VERSION_1_8
 group = 'com.serotonin'
 version = '4.0.0-6'
 
+
 repositories {
     jcenter()
     mavenLocal()
